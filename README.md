@@ -16,7 +16,7 @@ To select shape on working area
 To unselect 
 - click on background.
 
-To change formatting of (or delete) shape
+To change formatting of, add text to, or delete shape
 - right-click on selected shape
 
 To change size of the selected shape - drag on border 
