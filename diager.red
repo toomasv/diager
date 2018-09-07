@@ -106,6 +106,7 @@ ctx: context [
 		out
 	]
 	connected: none
+	filename: none
 	view/no-wait/flags/options lay: layout [
 		backdrop rebolor 
 		panel 120x420 [
@@ -426,8 +427,8 @@ ctx: context [
 					"connector" [
 						"line" line 
 						"spline" spline
-						"start-arrow" sarrow
-						"end-arrow" earrow
+						"start-arrow" sarrow ; TBD
+						"end-arrow" earrow ; TBD
 					]
 				]
 			]
@@ -452,16 +453,29 @@ ctx: context [
 					]
 					spline [edit/draw/7: 'spline change s 'spline]
 					line [edit/draw/7: 'line change s 'line]
-					sarrow []
-					earrow []
+					sarrow [] ; TBD
+					earrow [] ; TBD
 				]
 			]
 	][resize][
+		menu: [
+			"File" ["New" new "Open" open "Add" add "Save" save "Save as ..." save-as "Export" export]
+		]
 		actors: object [
-			on-resizing: func [face event] [
+			on-resizing: func [face event][
 				face/pane/1/size/y: face/size/y - 20 
 				face/pane/2/size: canvas/size: edit/size: face/size - 150x20
 				face/pane/3/size: face/size - 20
+			]
+			on-menu: func [face event /local fn][
+				switch event/picked [
+					new [filename: none clear canvas/draw]
+					open [if fn: request-file/filter ["*.dgr"][append clear canvas/draw load filename: fn]]
+					add [if fn: request-file/filter ["*.dgr"][append canvas/draw load fn]]
+					save [either filename [save filename canvas/draw][if fn: request-file/save [save fn canvas/draw]]]
+					save-as [if fn: request-file/save [save fn canvas/draw]]
+					export [if fn: request-file/save/filter ["*.png" "*.jpeg" "*.gif"] [save fn draw canvas/size canvas/draw]]
+				]
 			]
 		]
 	]
