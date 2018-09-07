@@ -1,5 +1,5 @@
 # diager
-Simple interactive diagramming tool
+**Simple interactive diagramming tool**
 
 To get a shape to working area:
 - click on shape, release, drag to working area, release.
