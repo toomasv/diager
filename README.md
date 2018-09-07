@@ -9,6 +9,7 @@ To put a shape onto 10x10 grid
 
 To draw a line:
 - shift-down, click and drag on working area, also on shapes if they are not selected (ctrl for grid)
+- holding additionally down right-mouse while dragging changes the shape of line
 
 To select shape on working area:
 - click on it, release
