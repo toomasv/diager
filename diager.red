@@ -1,7 +1,7 @@
 Red [
 	Author: "Toomas Vooglaid"
 	Date: 2018-08-24
-	Changed: 2018-09-07
+	Changed: 2018-09-08
 	Purpose: {Simple interactive diagramming tool}
 ]
 do %../drawing/pallette1.red
@@ -73,32 +73,32 @@ ctx: context [
 			box [
 				parse head s [
 					some [ser: if (ser = s) 4 skip | ser: pair! if (all [
-						not s/-2 = 'ellipse 
-						within? ser/1 s/2 s/3 - s/2 + 1
-					])(append/only out ser) | skip]
+						not ser/-2 = 'ellipse
+						within? ser/1 s/2 - 2 s/3 - s/2 + 3
+					])( (probe skip ser -2) append/only out ser) | skip]
 				]
 			]
 			ellipse [
 				parse head s [
 					some [ser: if (ser = s) 3 skip | ser: pair! if (all [
-						not s/-2 = 'ellipse 
-						within? ser/1 s/2 s/3
+						not ser/-2 = 'ellipse 
+						within? ser/1 s/2 - 2 s/3 + 4
 					])(append/only out ser) | skip]
 				]
 			]
 			circle [
 				parse head s [
 					some [ser: if (ser = s) 3 skip | ser: pair! if (all [
-						not s/-2 = 'ellipse 
-						within? ser/1 s/2 - as-pair s/3 s/3 2 * as-pair s/3 s/3
+						not ser/-2 = 'ellipse 
+						within? ser/1 -2 + s/2 - as-pair s/3 s/3 2 * (to-pair s/3) + 4
 					])(append/only out ser) | skip]				
 				]
 			]
 			translate [
 				parse head s [
 					some [ser: if (ser = s) 3 skip | ser: pair! if (all [
-						not s/-2 = 'ellipse 
-						within? ser/1 s/2 + as-pair s/3/2/6/x s/3/2/2/y as-pair s/3/2/4/x - s/3/2/6/x s/3/2/5/y - s/3/2/2/y
+						not ser/-2 = 'ellipse 
+						within? ser/1 -2 + s/2 + as-pair s/3/2/6/x s/3/2/2/y as-pair s/3/2/4/x - s/3/2/6/x s/3/2/5/y - s/3/2/2/y + 4
 					])(append/only out ser) | skip]
 				]
 			]
@@ -107,6 +107,21 @@ ctx: context [
 	]
 	connected: none
 	filename: none
+	select-size: func [s][
+		either s/1 = 'circle [
+			either attempt [s/2 = s/5][12][9]
+		][
+			select [box 10 ellipse 9 translate 9 line 11 text 9] s/1
+		]
+		;switch s/1 [
+		;	box [10] 
+		;	ellipse [9] 
+		;	circle [either attempt [s/2 = s/5][12][9]] 
+		;	translate [9] 
+		;	line [11]
+		;	text [9]
+		;]
+	]
 	view/no-wait/flags/options lay: layout [
 		backdrop rebolor 
 		panel 120x420 [
@@ -173,7 +188,7 @@ ctx: context [
 					either event/shift? [
 						ofs: either event/ctrl? [round/to event/offset 10][event/offset]
 						append face/draw compose/deep [
-							fill-pen glass pen black line-width 1 line (ofs) (ofs) (ofs) (ofs)
+							fill-pen transparent pen black line-width 1 line (ofs) (ofs) (ofs) (ofs)
 						]
 						dlen: length? face/draw
 						start?: yes
@@ -258,29 +273,29 @@ ctx: context [
 					either find [line spline] s/1 [
 						;df: either event/ctrl? [round/to event/offset 10][event/offset]
 						case [
-							within? event/offset s/2 - 5 11x11 [face/draw/8: s/2: either event/ctrl? [round/to event/offset 10][event/offset]]
-							within? event/offset s/3 - 5 11x11 [face/draw/9: s/3: either event/ctrl? [round/to event/offset 10][event/offset]]
-							within? event/offset s/4 - 5 11x11 [face/draw/10: s/4: either event/ctrl? [round/to event/offset 10][event/offset]]
-							within? event/offset s/5 - 5 11x11 [face/draw/11: s/5: either event/ctrl? [round/to event/offset 10][event/offset]]
+							within? event/offset s/2 - 5 11x11 [face/draw/8: s/2: either event/ctrl? [round/to event/offset 5][event/offset]]
+							within? event/offset s/3 - 5 11x11 [face/draw/9: s/3: either event/ctrl? [round/to event/offset 5][event/offset]]
+							within? event/offset s/4 - 5 11x11 [face/draw/10: s/4: either event/ctrl? [round/to event/offset 5][event/offset]]
+							within? event/offset s/5 - 5 11x11 [face/draw/11: s/5: either event/ctrl? [round/to event/offset 5][event/offset]]
 							within? event/offset (min s/2 s/3) - 5 (absolute s/3 - s/2) + 11 [
 								either s/2/x = s/3/x [
-									face/draw/8/x: face/draw/9/x: s/2/x: s/3/x: either event/ctrl? [round/to event/offset/x 10][event/offset/x]
+									face/draw/8/x: face/draw/9/x: s/2/x: s/3/x: either event/ctrl? [round/to event/offset/x 5][event/offset/x]
 								][
-									face/draw/8/y: face/draw/9/y: s/2/y: s/3/y: either event/ctrl? [round/to event/offset/y 10][event/offset/y]
+									face/draw/8/y: face/draw/9/y: s/2/y: s/3/y: either event/ctrl? [round/to event/offset/y 5][event/offset/y]
 								]
 							]
 							within? event/offset (min s/3 s/4) - 5 (absolute s/4 - s/3) + 11 [
 								either s/3/x = s/4/x [
-									face/draw/9/x: face/draw/10/x: s/3/x: s/4/x: either event/ctrl? [round/to event/offset/x 10][event/offset/x]
+									face/draw/9/x: face/draw/10/x: s/3/x: s/4/x: either event/ctrl? [round/to event/offset/x 5][event/offset/x]
 								][
-									face/draw/9/y: face/draw/10/y: s/3/y: s/4/y: either event/ctrl? [round/to event/offset/y 10][event/offset/y]
+									face/draw/9/y: face/draw/10/y: s/3/y: s/4/y: either event/ctrl? [round/to event/offset/y 5][event/offset/y]
 								]
 							]
 							within? event/offset (min s/4 s/5) - 5 (absolute s/5 - s/4) + 11 [
 								either s/4/x = s/5/x [
-									face/draw/10/x: face/draw/11/x: s/4/x: s/5/x: either event/ctrl? [round/to event/offset/x 10][event/offset/x]
+									face/draw/10/x: face/draw/11/x: s/4/x: s/5/x: either event/ctrl? [round/to event/offset/x 5][event/offset/x]
 								][
-									face/draw/10/y: face/draw/11/y: s/4/y: s/5/y: either event/ctrl? [round/to event/offset/y 10][event/offset/y]
+									face/draw/10/y: face/draw/11/y: s/4/y: s/5/y: either event/ctrl? [round/to event/offset/y 5][event/offset/y]
 								]
 							]
 						]
@@ -327,7 +342,7 @@ ctx: context [
 									true [
 										face/draw/8: s/2: df 
 										face/draw/9: s/3: s/2 + face/extra/2 - 1
-										forall connected [change connected/1 connected/1/1 + pos3diff]
+										unless event/shift? [forall connected [change connected/1 connected/1/1 + pos3diff]]
 									]
 								]
 							]
@@ -344,7 +359,7 @@ ctx: context [
 											face/draw/11: s/5: df
 										]
 										face/draw/8: s/2: df 
-										forall connected [change connected/1 connected/1/1 + pos3diff]
+										unless event/shift? [forall connected [change connected/1 connected/1/1 + pos3diff]]
 									]
 								]
 							]
@@ -373,7 +388,7 @@ ctx: context [
 									]
 									true [
 										face/draw/8: s/2: df
-										forall connected [change connected/1 connected/1/1 + pos3diff]
+										unless event/shift? [forall connected [change connected/1 connected/1/1 + pos3diff]]
 									]
 								]
 							]
@@ -405,7 +420,7 @@ ctx: context [
 									]
 									true [
 										face/draw/8: s/2: df 
-										forall connected [change connected/1 connected/1/1 + pos3diff]
+										unless event/shift? [forall connected [change connected/1 connected/1/1 + pos3diff]]
 									]
 								]
 							]
@@ -423,12 +438,18 @@ ctx: context [
 					"pen" pen 
 					"line-width" line-width
 					"text" text
-					"delete" delete
 					"connector" [
 						"line" line 
 						"spline" spline
 						"start-arrow" sarrow ; TBD
 						"end-arrow" earrow ; TBD
+					]
+					"delete" delete
+					"order" [
+						"back" back 
+						"backward" backward 
+						"forward" forward 
+						"front" front
 					]
 				]
 			]
@@ -440,21 +461,26 @@ ctx: context [
 						view/flags [field "2" 30 focus [also change back s face/data unview]][modal popup]
 					]
 					text [append s compose [fill-pen snow pen black line-width 1 text (get-text s) (last-text)]]
-					delete [
-						clear at edit/draw 7 
-						change/part skip s -6 [] switch s/1 [
-							box [10] 
-							ellipse [9] 
-							circle [either attempt [s/2 = s/5][12][9]] 
-							translate [9] 
-							line [11]
-							text [9]
-						]
-					]
 					spline [edit/draw/7: 'spline change s 'spline]
 					line [edit/draw/7: 'line change s 'line]
 					sarrow [] ; TBD
 					earrow [] ; TBD
+					delete [
+						clear at edit/draw 7 
+						change/part skip s -6 [] select-size s
+					]
+					back [move/part skip s -6 head s select-size s]
+					backward [move/part skip s -6 skip find/reverse skip s -6 word! -6 select-size s]
+					forward [
+						probe head s 
+						move/part probe skip s -6 
+							probe skip probe s2: 
+								probe skip s -6 + select-size s 
+								select-size skip s2 6
+							select-size s 
+						probe head s
+					]
+					front [move/part skip s -6 tail s select-size s]
 				]
 			]
 	][resize][
