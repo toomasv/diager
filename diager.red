@@ -1,7 +1,7 @@
 Red [
 	Author: "Toomas Vooglaid"
 	Date: 2018-08-24
-	Changed: 2018-09-08
+	Changed: 2018-09-11
 	Purpose: {Simple interactive diagramming tool}
 ]
 do %../drawing/pallette1.red
@@ -113,14 +113,24 @@ ctx: context [
 		][
 			select [box 10 ellipse 9 translate 9 line 11 text 9] s/1
 		]
-		;switch s/1 [
-		;	box [10] 
-		;	ellipse [9] 
-		;	circle [either attempt [s/2 = s/5][12][9]] 
-		;	translate [9] 
-		;	line [11]
-		;	text [9]
-		;]
+	]
+	follow: function [series pos /part size /abs ][
+		if integer? pos [
+			pos: either abs [at head series pos][skip series pos]
+		] 
+		size: any [size 1] 
+		switch/default pos [
+			head [move/part series s: head series size] 
+			tail [move/part series tail series size s: skip tail series negate size]
+		][
+			either (index? pos) > (index? series) [
+				move/part series s: back pos size 
+				s: skip pos negate size -1
+			][
+				move/part series s: pos size
+			]
+		]
+		s
 	]
 	view/no-wait/flags/options lay: layout [
 		backdrop rebolor 
@@ -162,7 +172,8 @@ ctx: context [
 		panel 620x420 [
 			at 0x0 canvas: box 0.0.0.254 620x420 all-over draw []
 				on-down [
-					clear at edit/draw 7
+					clear at edit1/draw 7
+					clear at edit2/draw 7
 					parse face/draw [some [s: ;(probe "s1" probe s probe index? s)
 						'box set start pair! set end pair! integer! 
 						if (within? event/offset start end - start + 1) (len: 4) break
@@ -194,7 +205,7 @@ ctx: context [
 						start?: yes
 						dir: none
 					][
-						if 1 < length? s [append edit/draw copy/deep/part s len]
+						if 1 < length? s [append edit1/draw copy/deep/part s len]
 					]
 					;probe "s2" probe s
 				]
@@ -244,7 +255,8 @@ ctx: context [
 		; `extra is a block of 2 elements: 
 		;	1) diff btw event/offset and "shape/offset"` 
 		;	2) usually `size` of shape (except in case of lines)
-		at 140x10 edit: box 620x420 extra [0 0] draw [fill-pen 0.0.0.254 pen blue line-width 2] all-over 
+		style edit: box 620x420 draw [fill-pen 0.0.0.254 pen blue line-width 2] all-over
+		at 140x10 edit1: edit extra [0 0] 
 			; On-down remember some values
 			on-down [
 				pos1: pos3: either event/ctrl? [round/to event/offset 10][event/offset]
@@ -461,28 +473,44 @@ ctx: context [
 						view/flags [field "2" 30 focus [also change back s face/data unview]][modal popup]
 					]
 					text [append s compose [fill-pen snow pen black line-width 1 text (get-text s) (last-text)]]
-					spline [edit/draw/7: 'spline change s 'spline]
-					line [edit/draw/7: 'line change s 'line]
+					spline [edit1/draw/7: 'spline change s 'spline]
+					line [edit1/draw/7: 'line change s 'line]
 					sarrow [] ; TBD
-					earrow [] ; TBD
+					earrow [
+						
+					]
 					delete [
-						clear at edit/draw 7 
+						clear at edit1/draw 7 
 						change/part skip s -6 [] select-size s
 					]
-					back [move/part skip s -6 head s select-size s]
-					backward [move/part skip s -6 skip find/reverse skip s -6 word! -6 select-size s]
-					forward [
-						probe head s 
-						move/part probe skip s -6 
-							probe skip probe s2: 
-								probe skip s -6 + select-size s 
-								select-size skip s2 6
-							select-size s 
-						probe head s
+					back [s: skip follow/part skip s -6 'head select-size s 6]
+					backward [
+						s: skip follow/part skip s -6 skip (
+							found: find/reverse skip s -6 word!
+							either found/-3 = 'circle [
+								found: skip found -3
+							][found]
+						) -6 select-size s 6
 					]
-					front [move/part skip s -6 tail s select-size s]
+					; Double circle doesn't work and shapes cannot be `forwarded` to uppermost position due to bug in `move`
+					;forward [
+					;	sz: select-size s
+					;	s: skip follow/part skip s -6 (
+					;		probe s2: skip s sz - 6
+					;		probe skip s2 select-size skip s2 6
+					;	) sz 6
+					;]
+					forward [
+						sz: select-size s
+						unless tail? skip s sz - 6 [
+							shape: take/part skip s -6 sz
+							s: skip insert skip s -6 + select-size s shape 6 - sz
+						]
+					]
+					front [probe s: skip follow/part skip s -6 'tail sz: select-size s 6]
 				]
 			]
+		at 140x10 edit2: edit
 	][resize][
 		menu: [
 			"File" ["New" new "Open" open "Add" add "Save" save "Save as ..." save-as "Export" export]
@@ -490,7 +518,8 @@ ctx: context [
 		actors: object [
 			on-resizing: func [face event][
 				face/pane/1/size/y: face/size/y - 20 
-				face/pane/2/size: canvas/size: edit/size: face/size - 150x20
+				face/pane/2/size: canvas/size: edit1/size: face/size - 150x20
+				face/pane/2/size: canvas/size: edit2/size: face/size - 150x20
 				face/pane/3/size: face/size - 20
 			]
 			on-menu: func [face event /local fn][
