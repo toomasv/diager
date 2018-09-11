@@ -17,7 +17,7 @@ To select shape on working area:
 To unselect:
 - click on background
 
-To change formatting of, add text to, or delete shape:
+To change formatting of, add text to, change ordering or delete shape:
 - right-click on selected shape
 
 To change size of the selected shape - drag on border:
@@ -27,5 +27,5 @@ To change size of the selected shape - drag on border:
 To change line:
 - drag on segments or points (intermediate or endpoints)
 
-Moving of shape covering the control-point(s) of another shape moves the control-point(s) of that shape too
+Moving of shape covering the control-point(s) of another shape moves the control-point(s) of that shape too. However, holding down shift moves the selected shape alone.
 
