@@ -1,7 +1,7 @@
 Red [
 	Author: "Toomas Vooglaid"
 	Date: 2018-08-24
-	Changed: 2018-09-11
+	Changed: 2018-09-13
 	Purpose: {Simple interactive diagramming tool}
 ]
 do %../drawing/pallette1.red
@@ -138,18 +138,20 @@ ctx: context [
 			; Left-hand exemplary shapes
 			style _shape: box 101x61
 				on-down [
-					upper/color: 0.0.0.254
 					append upper/pane layout/only compose/deep [
 						at (face/offset) base (face/extra/size) transparent loose 
-							draw [(head change at face/draw 2 255.255.255.150)]
+							draw [(head change at face/draw 2 255.255.255.100)]
 							on-up [
-								append canvas/draw head change at copy/deep face/draw (face/extra/pos) reduce [(face/extra/calc)]
+								if face/offset/x > 130 [
+									append canvas/draw head change at copy/deep face/draw (face/extra/pos) reduce [(face/extra/calc)]
+								]
 								clear upper/pane
 								upper/color: transparent
 								;set-focus canvas
 							]
 							on-drag [face/offset: either event/ctrl? [round/to face/offset 10][face/offset]]
 					]
+					upper/color: 0.0.0.254
 				]
 			below
 			; Box
@@ -175,7 +177,7 @@ ctx: context [
 					clear at edit1/draw 7
 					clear at edit2/draw 7
 					parse face/draw [some [s: ;(probe "s1" probe s probe index? s)
-						'box set start pair! set end pair! integer! 
+						'box set start pair! set end pair! set radius integer! 
 						if (within? event/offset start end - start + 1) (len: 4) break
 					|	'ellipse set start pair! set size pair!
 						if (within? event/offset start size) (len: 3) break
@@ -206,6 +208,13 @@ ctx: context [
 						dir: none
 					][
 						if 1 < length? s [append edit1/draw copy/deep/part s len]
+						switch s/1 [
+							box [append edit2/draw compose [
+								circle (start) 5 circle (end) 5 circle (as-pair end/x - radius start/y + radius) 3]
+							]
+							ellipse [append edit2/draw compose [circle (start) 5 circle (start + size - 1) 5]]
+							line spline [append edit2/draw compose [circle (p1) 5 circle (p2) 5 circle (p3) 5 circle (p4) 5]]
+						]
 					]
 					;probe "s2" probe s
 				]
@@ -251,6 +260,26 @@ ctx: context [
 		]
 		; Upper layer to transport shapes onto canvas (see first panel `style _shape`)
 		at 10x10 upper: base 750x420 transparent with [pane: copy []]
+			on-up [
+				either event/offset/x > 130 [
+					pos1: either event/ctrl? [round/to event/offset 10][event/offset]
+					append canvas/draw head change at copy/deep face/pane/1/draw 8 reduce switch face/pane/1/draw/7 [
+						box [[beg: pos1 - 130x0 beg + face/pane/1/draw/9]]
+						ellipse [[pos1 - 130x0]]
+						translate [[pos1 - 130x0]]
+						circle [
+							either face/pane/1/draw/10 = 'circle [
+								[pos1 - 100x-30 30 'circle pos1 - 100x-30]
+							][
+								[pos1 - 100x-30]
+							]
+						]
+					] 
+				][
+					clear upper/pane
+					upper/color: transparent
+				]
+			]
 		; Editing panel - transparent layer upon canvas
 		; `extra is a block of 2 elements: 
 		;	1) diff btw event/offset and "shape/offset"` 
@@ -264,7 +293,7 @@ ctx: context [
 				face/extra/1: event/offset - face/draw/8
 				switch face/draw/7 [
 					; In case of normal shapes register size ; NB circle?
-					box [face/extra/2: face/draw/9 - face/draw/8 + 1]
+					box [face/extra/2: face/draw/9 - face/draw/8 + 1 df11: df12: dist11: dist12: none]
 					ellipse [face/extra/2: face/draw/9]
 					translate [face/extra/2: as-pair face/draw/9/2/4/x face/draw/9/2/5/y]
 					; In case of lines register segments
@@ -284,30 +313,55 @@ ctx: context [
 				if event/down? [
 					either find [line spline] s/1 [
 						;df: either event/ctrl? [round/to event/offset 10][event/offset]
+						df2: pos3 - s/2 df3: pos3 - s/3
+						df3: pos3 - s/3 df4: pos3 - s/4
+						df4: pos3 - s/4 df5: pos3 - s/5
+						pos3: either event/ctrl? [round/to event/offset 5][event/offset]
 						case [
-							within? event/offset s/2 - 5 11x11 [face/draw/8: s/2: either event/ctrl? [round/to event/offset 5][event/offset]]
-							within? event/offset s/3 - 5 11x11 [face/draw/9: s/3: either event/ctrl? [round/to event/offset 5][event/offset]]
-							within? event/offset s/4 - 5 11x11 [face/draw/10: s/4: either event/ctrl? [round/to event/offset 5][event/offset]]
-							within? event/offset s/5 - 5 11x11 [face/draw/11: s/5: either event/ctrl? [round/to event/offset 5][event/offset]]
-							within? event/offset (min s/2 s/3) - 5 (absolute s/3 - s/2) + 11 [
-								either s/2/x = s/3/x [
-									face/draw/8/x: face/draw/9/x: s/2/x: s/3/x: either event/ctrl? [round/to event/offset/x 5][event/offset/x]
-								][
-									face/draw/8/y: face/draw/9/y: s/2/y: s/3/y: either event/ctrl? [round/to event/offset/y 5][event/offset/y]
+							;within? event/offset s/2 - 5 11x11 [face/draw/8: s/2: either event/ctrl? [round/to event/offset 5][event/offset]]
+							;within? event/offset s/3 - 5 11x11 [face/draw/9: s/3: either event/ctrl? [round/to event/offset 5][event/offset]]
+							;within? event/offset s/4 - 5 11x11 [face/draw/10: s/4: either event/ctrl? [round/to event/offset 5][event/offset]]
+							;within? event/offset s/5 - 5 11x11 [face/draw/11: s/5: either event/ctrl? [round/to event/offset 5][event/offset]]
+							within? event/offset (min s/2 s/3) - 7 (absolute s/3 - s/2) + 15 [
+								case [
+									s/2/x = s/3/x [
+										face/draw/8/x: face/draw/9/x: s/2/x: s/3/x: edit2/draw/8/x: edit2/draw/11/x: pos3/x
+									]
+									s/2/y = s/3/y [
+										face/draw/8/y: face/draw/9/y: s/2/y: s/3/y: edit2/draw/8/y: edit2/draw/11/y: pos3/y
+									]
+									'else [
+										face/draw/8: s/2: edit2/draw/8: pos3 - df2
+										face/draw/9: s/3: edit2/draw/11: pos3 - df3
+									]
 								]
 							]
-							within? event/offset (min s/3 s/4) - 5 (absolute s/4 - s/3) + 11 [
-								either s/3/x = s/4/x [
-									face/draw/9/x: face/draw/10/x: s/3/x: s/4/x: either event/ctrl? [round/to event/offset/x 5][event/offset/x]
-								][
-									face/draw/9/y: face/draw/10/y: s/3/y: s/4/y: either event/ctrl? [round/to event/offset/y 5][event/offset/y]
+							within? event/offset (min s/3 s/4) - 7 (absolute s/4 - s/3) + 15 [
+								case [
+									s/3/x = s/4/x [
+										face/draw/9/x: face/draw/10/x: s/3/x: s/4/x: edit2/draw/11/x: edit2/draw/14/x: pos3/x
+									]
+									s/3/y = s/4/y [
+										face/draw/9/y: face/draw/10/y: s/3/y: s/4/y: edit2/draw/11/y: edit2/draw/14/y: pos3/y
+									]
+									'else [
+										face/draw/9: s/3: edit2/draw/11: pos3 - df3
+										face/draw/10: s/4: edit2/draw/14: pos3 - df4
+									]
 								]
 							]
-							within? event/offset (min s/4 s/5) - 5 (absolute s/5 - s/4) + 11 [
-								either s/4/x = s/5/x [
-									face/draw/10/x: face/draw/11/x: s/4/x: s/5/x: either event/ctrl? [round/to event/offset/x 5][event/offset/x]
-								][
-									face/draw/10/y: face/draw/11/y: s/4/y: s/5/y: either event/ctrl? [round/to event/offset/y 5][event/offset/y]
+							within? event/offset (min s/4 s/5) - 7 (absolute s/5 - s/4) + 15 [
+								case [
+									s/4/x = s/5/x [
+										face/draw/10/x: face/draw/11/x: s/4/x: s/5/x: edit2/draw/14/x: edit2/draw/17/x: pos3/x
+									]
+									s/4/y = s/5/y [
+										face/draw/10/y: face/draw/11/y: s/4/y: s/5/y: edit2/draw/14/y: edit2/draw/17/y: pos3/y
+									]
+									'else [
+										face/draw/10: s/4: edit2/draw/14: pos3 - df4
+										face/draw/11: s/5: edit2/draw/17: pos3 - df5
+									]
 								]
 							]
 						]
@@ -315,45 +369,53 @@ ctx: context [
 						df: event/offset - face/extra/1
 						if event/ctrl? [df: round/to df 10]
 						diff: either event/ctrl? [round/to event/offset 10][event/offset]
+						;pos3: either event/ctrl? [round/to event/offset 5][event/offset]
 						pos3diff: diff - pos3
 						switch face/draw/7 [
 							box [
 								case [
+									; upper border
 									within? event/offset s/2 - 0x7 as-pair face/extra/2/x 15 [
-										face/draw/8/y: s/2/y: diff/y 
+										face/draw/8/y: s/2/y: edit2/draw/8/y: diff/y 
+										edit2/draw/14/y: diff/y + s/4
 										either event/shift? [
-											face/draw/9/y: s/3/y: pos2/y + face/extra/2/y - (diff/y - pos1/y)
+											face/draw/9/y: s/3/y: edit2/draw/11/y: pos2/y + face/extra/2/y - (diff/y - pos1/y)
 										][
 											face/extra/2: s/3 - s/2 + 1
 										]
 									]
+									; lower border
 									within? event/offset (as-pair s/2/x s/3/y) - 0x7 as-pair face/extra/2/x 15 [
-										face/draw/9/y: s/3/y: diff/y 
+										face/draw/9/y: s/3/y: edit2/draw/11/y: diff/y 
 										either event/shift? [
-											face/draw/8/y: s/2/y: pos2/y - (diff/y - pos1/y)
+											face/draw/8/y: s/2/y: edit2/draw/8/y: pos2/y - (diff/y - pos1/y)
 										][
 											face/extra/2: s/3 - s/2 + 1
 										]
 									]
+									; left border
 									within? event/offset s/2 - 7x0 as-pair 15 face/extra/2/y [
-										face/draw/8/x: s/2/x: diff/x
+										face/draw/8/x: s/2/x: edit2/draw/8/x: diff/x
 										either event/shift? [
-											face/draw/9/x: s/3/x: pos2/x + face/extra/2/x - (diff/x - pos1/x)
+											face/draw/9/x: s/3/x: edit2/draw/11/x: pos2/x + face/extra/2/x - (diff/x - pos1/x)
 										][
 											face/extra/2: s/3 - s/2 + 1
 										]
 									]
+									; right border
 									within? event/offset (as-pair s/3/x s/2/y) - 7x0 as-pair 15 face/extra/2/y [
-										face/draw/9/x: s/3/x: diff/x
+										face/draw/9/x: s/3/x: edit2/draw/11/x: diff/x
+										edit2/draw/14/x: diff/x - s/4
 										either event/shift? [
-											face/draw/8/x: s/2/x: pos2/x - (diff/x - pos1/x)
+											face/draw/8/x: s/2/x: edit2/draw/8/x: pos2/x - (diff/x - pos1/x)
 										][
 											face/extra/2: s/3 - s/2 + 1
 										]
 									]
 									true [
-										face/draw/8: s/2: df 
-										face/draw/9: s/3: s/2 + face/extra/2 - 1
+										face/draw/8: s/2: edit2/draw/8: df 
+										face/draw/9: s/3: edit2/draw/11: s/2 + face/extra/2 - 1
+										edit2/draw/14: as-pair s/3/x - s/4 s/2/y + s/4
 										unless event/shift? [forall connected [change connected/1 connected/1/1 + pos3diff]]
 									]
 								]
@@ -379,27 +441,36 @@ ctx: context [
 								;probe reduce [df event/offset s/2 face/extra]
 								diff2: either event/ctrl? [round/to df - s/2 10][df - s/2]
 								case [
+									; upper border
 									within? event/offset s/2 - 0x7 as-pair s/3/x 15 [
-										face/draw/8/y: s/2/y: df/y 
+										face/draw/8/y: s/2/y: edit2/draw/8/y: df/y 
 										face/draw/9/y: s/3/y: s/3/y - either event/shift? [2 * diff2/y][diff2/y]
+										edit2/draw/11/y: s/2/y + s/3/y - 1
 									]
+									; lower border
 									within? event/offset (as-pair s/2/x s/2/y + s/3/y - 1) - 0x7 as-pair s/3/x 15 [
 										;if event/shift? [
 										;	face/draw/8/y: s/2/y: pos2/y - (event/offset/y - pos1/y)
 										;]
 										face/draw/9/y: s/3/y: face/extra/2/y + diff2/y ;either event/shift? [2 * diff2/y][diff2/y]
+										edit2/draw/11/y: s/2/y + s/3/y - 1
 										;pos1: event/offset pos2: face/draw/8
 									]
+									; left border
 									within? event/offset s/2 - 7x0 as-pair 15 s/3/y [
-										face/draw/8/x: s/2/x: df/x
+										face/draw/8/x: s/2/x: edit2/draw/8/x: edit2/draw/8/x: df/x
 										face/draw/9/x: s/3/x: s/3/x - either event/shift? [2 * diff2/x][diff2/x]
+										edit2/draw/11/x: s/2/x + s/3/x - 1
 									]
+									; rigth border
 									within? event/offset (as-pair s/2/x + s/3/x - 1 s/2/y) - 7x0 as-pair 15 s/3/y [
 										;if event/shift? [face/draw/8/x: s/2/x: pos2/x - diff2/x]
 										face/draw/9/x: s/3/x: face/extra/2/x + diff2/x ;either event/shift? [2 * diff2/x][diff2/x]
+										edit2/draw/11/x: s/2/x + s/3/x - 1
 									]
 									true [
-										face/draw/8: s/2: df
+										face/draw/8: s/2: edit2/draw/8: df
+										edit2/draw/11: s/2 + s/3 - 1
 										unless event/shift? [forall connected [change connected/1 connected/1/1 + pos3diff]]
 									]
 								]
@@ -481,6 +552,7 @@ ctx: context [
 					]
 					delete [
 						clear at edit1/draw 7 
+						clear at edit2/draw 7 
 						change/part skip s -6 [] select-size s
 					]
 					back [s: skip follow/part skip s -6 'head select-size s 6]
@@ -507,13 +579,76 @@ ctx: context [
 							s: skip insert skip s -6 + select-size s shape 6 - sz
 						]
 					]
-					front [probe s: skip follow/part skip s -6 'tail sz: select-size s 6]
+					front [s: skip follow/part skip s -6 'tail sz: select-size s 6]
 				]
 			]
-		at 140x10 edit2: edit
+		at 140x10 edit2: edit 
+			on-down [
+				pos1: pos3: either event/ctrl? [round/to event/offset 10][event/offset]
+				parse edit1/draw [some [
+					'box set start pair! set end pair! set radius integer! (
+						diff-start: sqrt add power first ds: pos1 - start 2 power second ds 2
+						diff-end: sqrt add power first ds: pos1 - end 2 power second ds 2
+						diff-rad: sqrt add power first ds: pos1 - as-pair s/3/x - s/4 s/2/y + s/4 2 power second ds 2
+					)[
+						if (diff-start <= 5) (face/extra: [2 8 8]) 
+					| 	if (diff-end <= 5) (face/extra: [3 9 11])
+					| 	if (diff-rad <= 3) (face/extra: [4 10 14])
+					]
+				|	'ellipse set start pair! set size pair! (
+						diff-start: sqrt add power first ds: pos1 - start 2 power second ds 2
+						diff-end: sqrt add power first ds: pos1 - (start + size - 1) 2 power second ds 2
+					)[
+						if (diff-start <= 5) (face/extra: [2 8 8]) 
+					| 	if (diff-end <= 5) (face/extra: [3 9 11])
+					]
+				|	['line | 'spline] copy points some pair! (
+						forall points [
+							if 5 >= sqrt add power first ds: pos1 - points/1 2 power second ds 2 [
+								i: index? points 
+								face/extra: reduce [1 + i 7 + i 7 + (i - 1 * 3 + 1)]
+							]
+						]
+					)
+				| 	skip
+				]]
+			]
+			on-over [
+				if event/down? [
+					pos3: either event/ctrl? [round/to event/offset 10][event/offset]
+					switch s/1 [
+						box [
+							edit2/draw/(face/extra/3): either face/extra/1 = 4 [
+								case/all [
+									pos3/x > s/3/x [pos3/x: s/3/x]
+									pos3/y < s/2/y [pos3/y: s/2/y]
+								]
+								pos3
+							][pos3]
+							s/(face/extra/1): edit1/draw/(face/extra/2): either face/extra/1 = 4 [
+								df: pos3 - (as-pair s/3/x s/2/y)
+								df: max absolute df/x absolute df/y
+							][pos3]
+							switch face/extra/1 [
+								2 [edit2/draw/14/y: s/2/y + s/4]
+								3 [edit2/draw/14/x: s/3/x - s/4]
+							]
+						]
+						ellipse [
+							s/(face/extra/1): edit1/draw/(face/extra/2): either face/extra/1 = 2 [pos3][pos3 - s/2 + 1]
+							if face/extra/1 = 2 [s/3: edit1/draw/9: face/draw/11 - s/2 + 1]
+							edit2/draw/(face/extra/3): pos3
+						]
+						line spline [
+							s/(face/extra/1): edit1/draw/(face/extra/2): edit2/draw/(face/extra/3): pos3
+						]
+					]
+				]
+			]
 	][resize][
 		menu: [
 			"File" ["New" new "Open" open "Add" add "Save" save "Save as ..." save-as "Export" export]
+			"Edit" ["Clear" clear]
 		]
 		actors: object [
 			on-resizing: func [face event][
@@ -530,6 +665,8 @@ ctx: context [
 					save [either filename [save filename canvas/draw][if fn: request-file/save [save fn canvas/draw]]]
 					save-as [if fn: request-file/save [save fn canvas/draw]]
 					export [if fn: request-file/save/filter ["*.png" "*.jpeg" "*.gif"] [save fn draw canvas/size canvas/draw]]
+					
+					clear [clear canvas/draw]
 				]
 			]
 		]
