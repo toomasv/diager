@@ -35,6 +35,8 @@ Moving of shape covering the control-point(s) of another shape moves the control
 **Styling**
 
 To change style of all shapes at once choose "Style" from main menu.
+
 To change style of shape species right-click on shape in the left panel.
+
 To change the style of individual shape right-clik on it.
 
