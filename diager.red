@@ -1,12 +1,12 @@
 Red [
 	Author: "Toomas Vooglaid"
 	Date: 2018-08-24
-	Changed: 2018-09-13
+	Changed: 2018-09-15
 	Purpose: {Simple interactive diagramming tool}
 ]
 do %../drawing/pallette1.red
 ctx: context [
-	s: none
+	s: h1: h2: h3: v1: v2: v3: diff: df: pos1: pos2: pos3: none
 	short-text: function [title-text /htext hint-text][
 		view/flags [
 			title title-text 
@@ -40,11 +40,12 @@ ctx: context [
 	]
 	ask-long-text: does [long-text "Enter text"]
 	text-box: make face! [type: 'box]
-	get-text: func [ser /local sz ofs wc hc][
+	last-text: none
+	text-pos: func [ser /local sz ofs wc hc out][
 		last-text: ask-long-text
 		sz: size-text/with text-box last-text
 		ofs: s/2
-		switch ser/1 [
+		out: switch ser/1 [
 			box [
 				wc: s/3/x - s/2/x / 2
 				hc: s/3/y - s/2/y / 2
@@ -55,17 +56,21 @@ ctx: context [
 				hc: s/3/y / 2
 				as-pair s/2/x + wc - (sz/x / 2) s/2/y + hc - (sz/y / 2)
 			]
-			translate [
-				wc: s/3/2/4/x - s/3/2/6/x / 2 + s/3/2/6/x
-				hc: s/3/2/5/y - s/3/2/2/y / 2 + s/3/2/2/y
-				as-pair s/2/x + wc - (sz/x / 2) s/2/y + hc - (sz/y / 2)
-			]
+			; Diamond representation replaced
+			;translate [
+			;	wc: s/3/2/4/x - s/3/2/6/x / 2 + s/3/2/6/x
+			;	hc: s/3/2/5/y - s/3/2/2/y / 2 + s/3/2/2/y
+			;	as-pair s/2/x + wc - (sz/x / 2) s/2/y + hc - (sz/y / 2)
+			;]
+			polygon [
+				as-pair s/2/x - (sz/x / 2) s/3/y - (sz/y / 2)
+			]			
 			circle [
 				as-pair s/2/x - (sz/x / 2) s/2/y - (sz/y / 2)
 			]
-		]
+		] 
+		out - 2
 	]
-	last-text: none
 	between: func [n1 n2 n3][any [all [n1 >= n2 n1 <= n3] all [n1 <= n2 n1 >= n3]]]
 	gather: func [s /local out][
 		out: copy []
@@ -94,11 +99,20 @@ ctx: context [
 					])(append/only out ser) | skip]				
 				]
 			]
+			comment {
 			translate [
 				parse head s [
 					some [ser: if (ser = s) 3 skip | ser: pair! if (all [
 						not ser/-2 = 'ellipse 
 						within? ser/1 -2 + s/2 + as-pair s/3/2/6/x s/3/2/2/y as-pair s/3/2/4/x - s/3/2/6/x s/3/2/5/y - s/3/2/2/y + 4
+					])(append/only out ser) | skip]
+				]
+			]}
+			polygon [
+				parse head s [
+					some [ser: if (ser = s) 5 skip | ser: pair! if (all [
+						not ser/-2 = 'ellipse 
+						within? ser/1 -2 + as-pair s/5/x s/2/y as-pair s/3/x - s/5/x + 1 s/4/y - s/2/y + 5
 					])(append/only out ser) | skip]
 				]
 			]
@@ -111,7 +125,7 @@ ctx: context [
 		either s/1 = 'circle [
 			either attempt [s/2 = s/5][12][9]
 		][
-			select [box 10 ellipse 9 translate 9 line 11 text 9] s/1
+			select [box 10 ellipse 9 polygon 11 line 11 text 9] s/1 ; translate 9
 		]
 	]
 	follow: function [series pos /part size /abs ][
@@ -136,7 +150,7 @@ ctx: context [
 		backdrop rebolor 
 		panel 120x420 [
 			; Left-hand exemplary shapes
-			style _shape: box 101x61
+			style _shape: box 102x62
 				on-down [
 					append upper/pane layout/only compose/deep [
 						at (face/offset) base (face/extra/size) transparent loose 
@@ -155,14 +169,15 @@ ctx: context [
 				]
 			below
 			; Box
-			_shape draw [fill-pen snow pen black line-width 1 box 0x0 100x59 10] 
-				extra [size 101x60 pos 8 calc [beg: face/offset - 130x0 beg + face/draw/9]]
+			_shape draw [fill-pen snow pen black line-width 1 box 0x0 100x60 10] 
+				extra [size 101x61 pos 8 calc [beg: face/offset - 130x0 beg + face/draw/9]]
 			; Ellipse
-			_shape draw [fill-pen snow pen black line-width 1 ellipse 0x0 100x59]
-				extra [size 101x60 pos 8 calc [face/offset - 130x0]]
+			_shape draw [fill-pen snow pen black line-width 1 ellipse 0x0 100x60]
+				extra [size 102x62 pos 8 calc [face/offset - 130x0]]
 			; Diamond
-			_shape draw [fill-pen snow pen black line-width 1 translate 0x0 [shape [move 30x0 line 60x30 30x60 0x30]]]
-				extra [size 61x61 pos 8 calc [face/offset - 130x0]]
+			;_shape draw [fill-pen snow pen black line-width 1 translate 0x0 [shape [move 30x0 line 60x30 30x60 0x30]]]
+			_shape draw [fill-pen snow pen black line-width 1 polygon 30x0 60x30 30x60 0x30]
+				extra [size 61x61 pos 8 calc [df: face/offset - 100x0 df + 30x30 df + 0x60 df + -30x30]]
 			; Circle
 			_shape draw [fill-pen snow pen black line-width 1 circle 30x30 30]
 				extra [size 61x61 pos 8 calc [face/offset - 100x-30]]
@@ -172,6 +187,14 @@ ctx: context [
 			do [foreach-face self [face/offset/x: 120 - face/extra/size/x / 2]]
 		] 
 		panel 620x420 [
+			at 0x0 grid: box 620x420 draw [
+				fill-pen pattern 100x100 [
+					fill-pen pattern 10x10 [
+						pen 200.200.200 box 0x0 10x10
+					] pen 120.120.120 box 0x0 100x100 
+				]
+				pen off box 0x0 620x420
+			]
 			at 0x0 canvas: box 0.0.0.254 620x420 all-over draw []
 				on-down [
 					clear at edit1/draw 7
@@ -184,8 +207,12 @@ ctx: context [
 					|	'circle set center pair! set radius number! opt ['circle set cent2 pair!]
 						(diff: event/offset - center)
 						if (radius > sqrt add diff/x ** 2 diff/y ** 2) (len: either attempt [center = cent2] [6][3]) break
-					|	'translate set start pair!
-						if (within? event/offset start as-pair s/3/2/4/x s/3/2/5/y) (len: 3) break
+					;|	'translate set start pair!
+					;	if (within? event/offset start as-pair s/3/2/4/x s/3/2/5/y) (len: 3) break
+					|	'polygon set p1 pair! set p2 pair! set p3 pair! set p4 pair!
+						if (
+							within? event/offset as-pair p4/x p1/y as-pair p2/x - p4/x + 1 p3/y - p1/y + 1
+						)(len: 5) break
 					|	['line | 'spline] set p1 pair! set p2 pair! set p3 pair! set p4 pair!
 						if (
 							any [
@@ -212,7 +239,8 @@ ctx: context [
 							box [append edit2/draw compose [
 								circle (start) 5 circle (end) 5 circle (as-pair end/x - radius start/y + radius) 3]
 							]
-							ellipse [append edit2/draw compose [circle (start) 5 circle (start + size - 1) 5]]
+							ellipse [append edit2/draw compose [circle (start) 5 circle (start + size) 5]]
+							polygon [append edit2/draw compose [circle (p1) 5 circle (p2) 5 circle (p3) 5 circle (p4) 5]]
 							line spline [append edit2/draw compose [circle (p1) 5 circle (p2) 5 circle (p3) 5 circle (p4) 5]]
 						]
 					]
@@ -266,7 +294,8 @@ ctx: context [
 					append canvas/draw head change at copy/deep face/pane/1/draw 8 reduce switch face/pane/1/draw/7 [
 						box [[beg: pos1 - 130x0 beg + face/pane/1/draw/9]]
 						ellipse [[pos1 - 130x0]]
-						translate [[pos1 - 130x0]]
+						;translate [[pos1 - 130x0]]
+						polygon [[pos1 - 130x0 pos1 - 100x30 pos1 - 130x60 pos1 - 160x30]]
 						circle [
 							either face/pane/1/draw/10 = 'circle [
 								[pos1 - 100x-30 30 'circle pos1 - 100x-30]
@@ -284,18 +313,85 @@ ctx: context [
 		; `extra is a block of 2 elements: 
 		;	1) diff btw event/offset and "shape/offset"` 
 		;	2) usually `size` of shape (except in case of lines)
-		style edit: box 620x420 draw [fill-pen 0.0.0.254 pen blue line-width 2] all-over
+		style edit: box 620x420 draw [fill-pen 0.0.0.254 pen purple line-width 2] all-over
+		at 140x10 edit3: edit hidden draw [
+			pen papaya line-width 1 
+			h1: line 0x-2 620x-2 h2: line 0x-2 620x-2 h3: line 0x-2 620x-2 
+			v1: line -2x0 -2x420 v2: line -2x0 -2x420 v3: line -2x0 -2x420 
+		]
 		at 140x10 edit1: edit extra [0 0] 
 			; On-down remember some values
 			on-down [
 				pos1: pos3: either event/ctrl? [round/to event/offset 10][event/offset]
+				; Original start point
 				pos2: face/draw/8
+				; Difference from event/offset to start
 				face/extra/1: event/offset - face/draw/8
 				switch face/draw/7 [
 					; In case of normal shapes register size ; NB circle?
-					box [face/extra/2: face/draw/9 - face/draw/8 + 1 df11: df12: dist11: dist12: none]
-					ellipse [face/extra/2: face/draw/9]
-					translate [face/extra/2: as-pair face/draw/9/2/4/x face/draw/9/2/5/y]
+					; Horizontal and vertical guides
+					box [
+						face/extra/2: face/draw/9 - face/draw/8 + 1 
+						; upper horizontal
+						h1/2/y: h1/3/y: s/2/y 
+						; center horizontal
+						h2/2/y: h2/3/y: s/3/y - s/2/y / 2 + s/2/y
+						; lower horizontal
+						h3/2/y: h3/3/y: s/3/y
+						; left vertical
+						v1/2/x: v1/3/x: s/2/x 
+						; center vertical
+						v2/2/x: v2/3/x: s/3/x - s/2/x / 2 + s/2/x 
+						; right vertical
+						v3/2/x: v3/3/x: s/3/x
+						;df11: df12: dist11: dist12: none
+					]
+					ellipse [
+						face/extra/2: face/draw/9
+						; upper horizontal
+						h1/2/y: h1/3/y: s/2/y 
+						; center horizontal
+						h2/2/y: h2/3/y: s/3/y / 2 + s/2/y
+						; lower horizontal
+						h3/2/y: h3/3/y: s/2/y + s/3/y
+						; left vertical
+						v1/2/x: v1/3/x: s/2/x 
+						; center vertical
+						v2/2/x: v2/3/x: s/3/x / 2 + s/2/x 
+						; right vertical
+						v3/2/x: v3/3/x: s/2/x + s/3/x
+					]
+					;translate [face/extra/2: as-pair face/draw/9/2/4/x face/draw/9/2/5/y]
+					polygon [
+						face/extra/2: as-pair face/draw/9/x - face/draw/11/x + 1 face/draw/10/y - face/draw/8/y + 1
+						; upper horizontal
+						h1/2/y: h1/3/y: s/2/y 
+						; center horizontal
+						h2/2/y: h2/3/y: s/3/y
+						; lower horizontal
+						h3/2/y: h3/3/y: s/4/y
+						; left vertical
+						v1/2/x: v1/3/x: s/5/x 
+						; center vertical
+						v2/2/x: v2/3/x: s/2/x 
+						; right vertical
+						v3/2/x: v3/3/x: s/3/x
+					]
+					; For circle there is no need for edit2 (control-points)
+					circle [
+						; upper horizontal
+						h1/2/y: h1/3/y: s/2/y - s/3 
+						; center horizontal
+						h2/2/y: h2/3/y: s/2/y
+						; lower horizontal
+						h3/2/y: h3/3/y: s/2/y + s/3
+						; left vertical
+						v1/2/x: v1/3/x: s/2/x - s/3 
+						; center vertical
+						v2/2/x: v2/3/x: s/2/x 
+						; right vertical
+						v3/2/x: v3/3/x: s/2/x + s/3
+					]
 					; In case of lines register segments
 					line spline [
 						case [
@@ -308,6 +404,7 @@ ctx: context [
 				unless find [line spline] face/draw/7 [
 					connected: gather s
 				]
+				edit3/visible?: yes
 			]
 			on-over [
 				if event/down? [
@@ -318,24 +415,31 @@ ctx: context [
 						df4: pos3 - s/4 df5: pos3 - s/5
 						pos3: either event/ctrl? [round/to event/offset 5][event/offset]
 						case [
+							; Control-points are replaced by circles
 							;within? event/offset s/2 - 5 11x11 [face/draw/8: s/2: either event/ctrl? [round/to event/offset 5][event/offset]]
 							;within? event/offset s/3 - 5 11x11 [face/draw/9: s/3: either event/ctrl? [round/to event/offset 5][event/offset]]
 							;within? event/offset s/4 - 5 11x11 [face/draw/10: s/4: either event/ctrl? [round/to event/offset 5][event/offset]]
 							;within? event/offset s/5 - 5 11x11 [face/draw/11: s/5: either event/ctrl? [round/to event/offset 5][event/offset]]
+							
+							; First segment
 							within? event/offset (min s/2 s/3) - 7 (absolute s/3 - s/2) + 15 [
 								case [
+									; horizontal
 									s/2/x = s/3/x [
 										face/draw/8/x: face/draw/9/x: s/2/x: s/3/x: edit2/draw/8/x: edit2/draw/11/x: pos3/x
 									]
+									; vertical
 									s/2/y = s/3/y [
 										face/draw/8/y: face/draw/9/y: s/2/y: s/3/y: edit2/draw/8/y: edit2/draw/11/y: pos3/y
 									]
+									; slanted
 									'else [
 										face/draw/8: s/2: edit2/draw/8: pos3 - df2
 										face/draw/9: s/3: edit2/draw/11: pos3 - df3
 									]
 								]
 							]
+							; Second segment
 							within? event/offset (min s/3 s/4) - 7 (absolute s/4 - s/3) + 15 [
 								case [
 									s/3/x = s/4/x [
@@ -350,6 +454,7 @@ ctx: context [
 									]
 								]
 							]
+							; Third segment
 							within? event/offset (min s/4 s/5) - 7 (absolute s/5 - s/4) + 15 [
 								case [
 									s/4/x = s/5/x [
@@ -380,27 +485,36 @@ ctx: context [
 										edit2/draw/14/y: diff/y + s/4
 										either event/shift? [
 											face/draw/9/y: s/3/y: edit2/draw/11/y: pos2/y + face/extra/2/y - (diff/y - pos1/y)
+											h3/2/y: h3/3/y: s/3/y
 										][
 											face/extra/2: s/3 - s/2 + 1
 										]
+										h1/2/y: h1/3/y: s/2/y
+										h2/2/y: h2/3/y: s/3/y - s/2/y / 2 + s/2/y
 									]
 									; lower border
 									within? event/offset (as-pair s/2/x s/3/y) - 0x7 as-pair face/extra/2/x 15 [
 										face/draw/9/y: s/3/y: edit2/draw/11/y: diff/y 
 										either event/shift? [
 											face/draw/8/y: s/2/y: edit2/draw/8/y: pos2/y - (diff/y - pos1/y)
+											h1/2/y: h1/3/y: s/2/y
 										][
 											face/extra/2: s/3 - s/2 + 1
 										]
+										h3/2/y: h3/3/y: s/3/y
+										h2/2/y: h2/3/y: s/3/y - s/2/y / 2 + s/2/y
 									]
 									; left border
 									within? event/offset s/2 - 7x0 as-pair 15 face/extra/2/y [
 										face/draw/8/x: s/2/x: edit2/draw/8/x: diff/x
 										either event/shift? [
 											face/draw/9/x: s/3/x: edit2/draw/11/x: pos2/x + face/extra/2/x - (diff/x - pos1/x)
+											v3/2/x: v3/3/x: s/3/x
 										][
 											face/extra/2: s/3 - s/2 + 1
 										]
+										v1/2/x: v1/3/x: s/2/x
+										v2/2/x: v2/3/x: s/3/x - s/2/x / 2 + s/2/x
 									]
 									; right border
 									within? event/offset (as-pair s/3/x s/2/y) - 7x0 as-pair 15 face/extra/2/y [
@@ -408,22 +522,87 @@ ctx: context [
 										edit2/draw/14/x: diff/x - s/4
 										either event/shift? [
 											face/draw/8/x: s/2/x: edit2/draw/8/x: pos2/x - (diff/x - pos1/x)
+											v1/2/x: v1/3/x: s/2/x
 										][
 											face/extra/2: s/3 - s/2 + 1
 										]
+										v3/2/x: v3/3/x: s/3/x
+										v2/2/x: v2/3/x: s/3/x - s/2/x / 2 + s/2/x
 									]
 									true [
 										face/draw/8: s/2: edit2/draw/8: df 
 										face/draw/9: s/3: edit2/draw/11: s/2 + face/extra/2 - 1
 										edit2/draw/14: as-pair s/3/x - s/4 s/2/y + s/4
+										h1/2/y: h1/3/y: s/2/y
+										h3/2/y: h3/3/y: s/3/y
+										h2/2/y: h2/3/y: s/3/y - s/2/y / 2 + s/2/y
+										v1/2/x: v1/3/x: s/2/x
+										v3/2/x: v3/3/x: s/3/x
+										v2/2/x: v2/3/x: s/3/x - s/2/x / 2 + s/2/x
 										unless event/shift? [forall connected [change connected/1 connected/1/1 + pos3diff]]
+									]
+								]
+							]
+							ellipse [
+								;probe reduce [df event/offset s/2 face/extra]
+								diff2: either event/ctrl? [round/to df - s/2 10][df - s/2]
+								cent: s/3 / 2 + s/2
+								case [
+									; upper border
+									within? event/offset s/2 - 0x7 as-pair s/3/x 15 [
+										face/draw/8/y: s/2/y: edit2/draw/8/y: df/y 
+										face/draw/9/y: s/3/y: s/3/y - either event/shift? [2 * diff2/y][diff2/y]
+										edit2/draw/11/y: s/2/y + s/3/y
+										h1/2/y: h1/3/y: s/2/y
+										h3/2/y: h3/3/y: s/2/y + s/3/y
+										h2/2/y: h2/3/y: s/3/y / 2 + s/2/y
+									]
+									; lower border
+									within? event/offset (as-pair s/2/x s/2/y + s/3/y) - 0x7 as-pair s/3/x 15 [
+										face/draw/9/y: s/3/y: face/extra/2/y + diff2/y 
+										if event/shift? [face/draw/8/y: s/2/y: cent/y - (s/3/y / 2)]
+										edit2/draw/11/y: s/2/y + s/3/y
+										h1/2/y: h1/3/y: s/2/y
+										h3/2/y: h3/3/y: s/2/y + s/3/y
+										h2/2/y: h2/3/y: s/3/y / 2 + s/2/y
+									]
+									; left border
+									within? event/offset s/2 - 7x0 as-pair 15 s/3/y [
+										face/draw/8/x: s/2/x: edit2/draw/8/x: edit2/draw/8/x: df/x
+										face/draw/9/x: s/3/x: s/3/x - either event/shift? [2 * diff2/x][diff2/x]
+										edit2/draw/11/x: s/2/x + s/3/x
+										v1/2/x: v1/3/x: s/2/x
+										v3/2/x: v3/3/x: s/2/x + s/3/x
+										v2/2/x: v2/3/x: s/3/x / 2 + s/2/x
+									]
+									; rigth border
+									within? event/offset (as-pair s/2/x + s/3/x s/2/y) - 7x0 as-pair 15 s/3/y [
+										face/draw/9/x: s/3/x: face/extra/2/x + diff2/x
+										if event/shift? [face/draw/8/x: s/2/x: cent/x - (s/3/x / 2)]
+										edit2/draw/11/x: s/2/x + s/3/x
+										v1/2/x: v1/3/x: s/2/x
+										v3/2/x: v3/3/x: s/2/x + s/3/x
+										v2/2/x: v2/3/x: s/3/x / 2 + s/2/x
+									]
+									true [
+										face/draw/8: s/2: edit2/draw/8: df
+										edit2/draw/11: s/2 + s/3
+										h1/2/y: h1/3/y: s/2/y
+										h3/2/y: h3/3/y: s/2/y + s/3/y
+										h2/2/y: h2/3/y: s/3/y / 2 + s/2/y
+										v1/2/x: v1/3/x: s/2/x
+										v3/2/x: v3/3/x: s/2/x + s/3/x
+										v2/2/x: v2/3/x: s/3/x / 2 + s/2/x
+										unless event/shift? [
+											forall connected [change connected/1 connected/1/1 + pos3diff]
+										]
 									]
 								]
 							]
 							circle [
 								case [
 									between dist: sqrt add power first dis: event/offset - s/2 2 dis/y ** 2 s/3 - 7 s/3 + 7 [
-										face/draw/9: s/3: either event/ctrl? [round/to dist 10][dist]
+										face/draw/9: s/3: either event/ctrl? [round/to dist 10][to-integer dist]
 										if attempt [face/draw/8 = face/draw/11] [
 											face/draw/12: s/6: s/3 - 3
 										]
@@ -436,45 +615,14 @@ ctx: context [
 										unless event/shift? [forall connected [change connected/1 connected/1/1 + pos3diff]]
 									]
 								]
+								h1/2/y: h1/3/y: s/2/y - s/3
+								h2/2/y: h2/3/y: s/2/y
+								h3/2/y: h3/3/y: s/2/y + s/3
+								v1/2/x: v1/3/x: s/2/x - s/3
+								v2/2/x: v2/3/x: s/2/x
+								v3/2/x: v3/3/x: s/2/x + s/3
 							]
-							ellipse [
-								;probe reduce [df event/offset s/2 face/extra]
-								diff2: either event/ctrl? [round/to df - s/2 10][df - s/2]
-								case [
-									; upper border
-									within? event/offset s/2 - 0x7 as-pair s/3/x 15 [
-										face/draw/8/y: s/2/y: edit2/draw/8/y: df/y 
-										face/draw/9/y: s/3/y: s/3/y - either event/shift? [2 * diff2/y][diff2/y]
-										edit2/draw/11/y: s/2/y + s/3/y - 1
-									]
-									; lower border
-									within? event/offset (as-pair s/2/x s/2/y + s/3/y - 1) - 0x7 as-pair s/3/x 15 [
-										;if event/shift? [
-										;	face/draw/8/y: s/2/y: pos2/y - (event/offset/y - pos1/y)
-										;]
-										face/draw/9/y: s/3/y: face/extra/2/y + diff2/y ;either event/shift? [2 * diff2/y][diff2/y]
-										edit2/draw/11/y: s/2/y + s/3/y - 1
-										;pos1: event/offset pos2: face/draw/8
-									]
-									; left border
-									within? event/offset s/2 - 7x0 as-pair 15 s/3/y [
-										face/draw/8/x: s/2/x: edit2/draw/8/x: edit2/draw/8/x: df/x
-										face/draw/9/x: s/3/x: s/3/x - either event/shift? [2 * diff2/x][diff2/x]
-										edit2/draw/11/x: s/2/x + s/3/x - 1
-									]
-									; rigth border
-									within? event/offset (as-pair s/2/x + s/3/x - 1 s/2/y) - 7x0 as-pair 15 s/3/y [
-										;if event/shift? [face/draw/8/x: s/2/x: pos2/x - diff2/x]
-										face/draw/9/x: s/3/x: face/extra/2/x + diff2/x ;either event/shift? [2 * diff2/x][diff2/x]
-										edit2/draw/11/x: s/2/x + s/3/x - 1
-									]
-									true [
-										face/draw/8: s/2: edit2/draw/8: df
-										edit2/draw/11: s/2 + s/3 - 1
-										unless event/shift? [forall connected [change connected/1 connected/1/1 + pos3diff]]
-									]
-								]
-							]
+							comment {
 							translate [
 								case [
 									within? event/offset s/2 + s/3/2/2 - 7 15x15 [
@@ -506,6 +654,20 @@ ctx: context [
 										unless event/shift? [forall connected [change connected/1 connected/1/1 + pos3diff]]
 									]
 								]
+							]}
+							polygon [
+								df2: s/3 - s/2 df3: s/4 - s/2 df4: s/5 - s/2
+								face/draw/8: s/2: edit2/draw/8: df 
+								face/draw/9: s/3: edit2/draw/11: s/2 + df2
+								face/draw/10: s/4: edit2/draw/14: s/2 + df3 
+								face/draw/11: s/5: edit2/draw/17: s/2 + df4 
+								h1/2/y: h1/3/y: s/2/y
+								h2/2/y: h2/3/y: s/3/y
+								h3/2/y: h3/3/y: s/4/y
+								v1/2/x: v1/3/x: s/5/x
+								v2/2/x: v2/3/x: s/2/x
+								v3/2/x: v3/3/x: s/3/x
+								unless event/shift? [forall connected [change connected/1 connected/1/1 + pos3diff]]
 							]
 							text [
 								face/draw/8: s/2: df
@@ -515,6 +677,7 @@ ctx: context [
 					]
 				]
 			]
+			on-up [edit3/visible?: no]
 			with [
 				menu: [
 					"fill-pen" fill-pen 
@@ -543,7 +706,7 @@ ctx: context [
 					line-width [
 						view/flags [field "2" 30 focus [also change back s face/data unview]][modal popup]
 					]
-					text [append s compose [fill-pen snow pen black line-width 1 text (get-text s) (last-text)]]
+					text [append s compose [fill-pen snow pen black line-width 1 text (text-pos s) (last-text)]]
 					spline [edit1/draw/7: 'spline change s 'spline]
 					line [edit1/draw/7: 'line change s 'line]
 					sarrow [] ; TBD
@@ -597,12 +760,12 @@ ctx: context [
 					]
 				|	'ellipse set start pair! set size pair! (
 						diff-start: sqrt add power first ds: pos1 - start 2 power second ds 2
-						diff-end: sqrt add power first ds: pos1 - (start + size - 1) 2 power second ds 2
+						diff-end: sqrt add power first ds: pos1 - (start + size) 2 power second ds 2
 					)[
 						if (diff-start <= 5) (face/extra: [2 8 8]) 
 					| 	if (diff-end <= 5) (face/extra: [3 9 11])
 					]
-				|	['line | 'spline] copy points some pair! (
+				|	['line | 'spline | 'polygon] copy points some pair! (
 						forall points [
 							if 5 >= sqrt add power first ds: pos1 - points/1 2 power second ds 2 [
 								i: index? points 
@@ -612,6 +775,7 @@ ctx: context [
 					)
 				| 	skip
 				]]
+				edit3/visible?: yes
 			]
 			on-over [
 				if event/down? [
@@ -633,11 +797,41 @@ ctx: context [
 								2 [edit2/draw/14/y: s/2/y + s/4]
 								3 [edit2/draw/14/x: s/3/x - s/4]
 							]
+							h1/2/y: h1/3/y: s/2/y
+							h3/2/y: h3/3/y: s/3/y
+							h2/2/y: h2/3/y: s/3/y - s/2/y / 2 + s/2/y
+							v1/2/x: v1/3/x: s/2/x
+							v3/2/x: v3/3/x: s/3/x
+							v2/2/x: v2/3/x: s/3/x - s/2/x / 2 + s/2/x
 						]
 						ellipse [
-							s/(face/extra/1): edit1/draw/(face/extra/2): either face/extra/1 = 2 [pos3][pos3 - s/2 + 1]
-							if face/extra/1 = 2 [s/3: edit1/draw/9: face/draw/11 - s/2 + 1]
+							s/(face/extra/1): edit1/draw/(face/extra/2): either face/extra/1 = 2 [pos3][pos3 - s/2]
+							if face/extra/1 = 2 [s/3: edit1/draw/9: face/draw/11 - s/2]
 							edit2/draw/(face/extra/3): pos3
+							h1/2/y: h1/3/y: s/2/y
+							h3/2/y: h3/3/y: s/2/y + s/3/y
+							h2/2/y: h2/3/y: s/3/y / 2 + s/2/y
+							v1/2/x: v1/3/x: s/2/x
+							v3/2/x: v3/3/x: s/2/x + s/3/x
+							v2/2/x: v2/3/x: s/3/x / 2 + s/2/x
+						]
+						polygon [
+							dim: pick [x y] odd? face/extra/1 
+							s/(face/extra/1)/:dim: edit1/draw/(face/extra/2)/:dim: edit2/draw/(face/extra/3)/:dim: pos3/:dim
+							if event/shift? [
+								switch face/extra/1 [
+									2 [edit1/draw/10/y: s/4/y: face/draw/14/y: s/2/y + (s/3/y - s/2/y * 2)]
+									3 [edit1/draw/11/x: s/5/x: face/draw/17/x: s/2/x - s/3/x + s/2/x]; trying different things
+									4 [edit1/draw/8/y: s/2/y: face/draw/8/y: s/3/y - s/4/y + s/3/y]
+									5 [edit1/draw/9/x: s/3/x: face/draw/11/x: s/2/x + s/2/x - s/5/x]
+								]
+							]
+							h1/2/y: h1/3/y: s/2/y
+							h3/2/y: h3/3/y: s/4/y
+							h2/2/y: h2/3/y: s/3/y
+							v1/2/x: v1/3/x: s/5/x
+							v3/2/x: v3/3/x: s/3/x
+							v2/2/x: v2/3/x: s/2/x
 						]
 						line spline [
 							s/(face/extra/1): edit1/draw/(face/extra/2): edit2/draw/(face/extra/3): pos3
@@ -645,17 +839,19 @@ ctx: context [
 					]
 				]
 			]
+			on-up [edit3/visible?: no]
 	][resize][
 		menu: [
 			"File" ["New" new "Open" open "Add" add "Save" save "Save as ..." save-as "Export" export]
-			"Edit" ["Clear" clear]
+			"Edit" ["Clear" clear "Grid off" grid-off ];"Edit grid" edit-grid]
 		]
 		actors: object [
 			on-resizing: func [face event][
 				face/pane/1/size/y: face/size/y - 20 
-				face/pane/2/size: canvas/size: edit1/size: face/size - 150x20
-				face/pane/2/size: canvas/size: edit2/size: face/size - 150x20
-				face/pane/3/size: face/size - 20
+				face/pane/2/size: grid/size: grid/draw/9: canvas/size: edit1/size: edit2/size: edit3/size: face/size - 150x20
+				upper/size: face/size - 20
+				h1/3/x: h3/3/x: h3/3/x: edit3/size/x
+				v1/3/y: v3/3/y: v3/3/y: edit3/size/y
 			]
 			on-menu: func [face event /local fn][
 				switch event/picked [
@@ -666,7 +862,10 @@ ctx: context [
 					save-as [if fn: request-file/save [save fn canvas/draw]]
 					export [if fn: request-file/save/filter ["*.png" "*.jpeg" "*.gif"] [save fn draw canvas/size canvas/draw]]
 					
-					clear [clear canvas/draw]
+					clear [clear canvas/draw clear at edit1/draw 7 clear at edit2/draw 7]
+					grid-off [grid/visible?: no change/part find face/menu/4 "Grid off" ["Grid on" grid-on] 2]
+					grid-on [grid/visible?: yes change/part find face/menu/4 "Grid on" ["Grid off" grid-off] 2]
+					edit-grid []; TBD
 				]
 			]
 		]
