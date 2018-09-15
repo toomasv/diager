@@ -6,7 +6,7 @@ Red [
 ]
 do %../drawing/pallette1.red
 ctx: context [
-	s: h1: h2: h3: v1: v2: v3: diff: df: pos1: pos2: pos3: none
+	s: h1: h2: h3: v1: v2: v3: diff: df: pos1: pos2: pos3: lw: none
 	short-text: function [title-text /htext hint-text][
 		view/flags [
 			title title-text 
@@ -72,7 +72,7 @@ ctx: context [
 		out - 2
 	]
 	between: func [n1 n2 n3][any [all [n1 >= n2 n1 <= n3] all [n1 <= n2 n1 >= n3]]]
-	gather: func [s /local out][
+	gather: func [s /local out ser][
 		out: copy []
 		switch s/1 [
 			box [
@@ -80,7 +80,7 @@ ctx: context [
 					some [ser: if (ser = s) 4 skip | ser: pair! if (all [
 						not ser/-2 = 'ellipse
 						within? ser/1 s/2 - 2 s/3 - s/2 + 3
-					])( (probe skip ser -2) append/only out ser) | skip]
+					])( (skip ser -2) append/only out ser) | skip]
 				]
 			]
 			ellipse [
@@ -148,24 +148,43 @@ ctx: context [
 	]
 	view/no-wait/flags/options lay: layout [
 		backdrop rebolor 
-		panel 120x420 [
+		shapes: panel 120x420 [
 			; Left-hand exemplary shapes
 			style _shape: box 102x62
-				on-down [
-					append upper/pane layout/only compose/deep [
-						at (face/offset) base (face/extra/size) transparent loose 
-							draw [(head change at face/draw 2 255.255.255.100)]
-							on-up [
-								if face/offset/x > 130 [
-									append canvas/draw head change at copy/deep face/draw (face/extra/pos) reduce [(face/extra/calc)]
+				with [
+					menu: ["fill-pen" fill-pen "pen" pen "line-width" line-width]
+					actors: object [
+						on-menu: func [face event] copy/deep [
+							switch event/picked [
+								fill-pen [face/draw/fill-pen: select-color]
+								pen [face/draw/pen: select-color]
+								line-width [
+									lw: 1
+									view/flags [field "2" 30 focus [also lw: face/data unview]][modal popup]
+									face/draw/line-width: lw
 								]
-								clear upper/pane
-								upper/color: transparent
-								;set-focus canvas
 							]
-							on-drag [face/offset: either event/ctrl? [round/to face/offset 10][face/offset]]
+							'done
+						]
+						on-down: func [face event] [
+							append upper/pane layout/only compose/deep [
+								at (face/offset + 5) base (face/extra/size) transparent loose 
+									;extra [(face/draw)]
+									draw [(face/draw)]
+									on-up [
+										if face/offset/x > 130 [
+											append canvas/draw head change at copy/deep face/draw (face/extra/pos) reduce [(face/extra/calc)]
+										]
+										clear upper/pane
+										upper/color: transparent
+										;set-focus canvas
+									]
+									on-drag [face/offset: either event/ctrl? [round/to face/offset 10][face/offset]]
+							]
+							; Make layer responsive
+							upper/color: 0.0.0.254
+						]
 					]
-					upper/color: 0.0.0.254
 				]
 			below
 			; Box
@@ -186,7 +205,7 @@ ctx: context [
 				extra [size 61x61 pos 8 calc [face/offset - 100x-30 30 'circle face/offset - 100x-30]]
 			do [foreach-face self [face/offset/x: 120 - face/extra/size/x / 2]]
 		] 
-		panel 620x420 [
+		drawing: panel white 620x420 [
 			at 0x0 grid: box 620x420 draw [
 				fill-pen pattern 100x100 [
 					fill-pen pattern 10x10 [
@@ -195,6 +214,7 @@ ctx: context [
 				]
 				pen off box 0x0 620x420
 			]
+			
 			at 0x0 canvas: box 0.0.0.254 620x420 all-over draw []
 				on-down [
 					clear at edit1/draw 7
@@ -279,10 +299,10 @@ ctx: context [
 								face/draw/:dlen: ofs
 							]
 						]
-						all [; Direct drawing of items
+						;all [; Direct drawing of items
 							;event/down?
 							
-						]
+						;]
 					]
 				]
 		]
@@ -744,6 +764,7 @@ ctx: context [
 					]
 					front [s: skip follow/part skip s -6 'tail sz: select-size s 6]
 				]
+				'done 
 			]
 		at 140x10 edit2: edit 
 			on-down [
@@ -844,11 +865,17 @@ ctx: context [
 		menu: [
 			"File" ["New" new "Open" open "Add" add "Save" save "Save as ..." save-as "Export" export]
 			"Edit" ["Clear" clear "Grid off" grid-off ];"Edit grid" edit-grid]
+			"Style" [
+				;"backdrop" backdrop
+				"fill-pen" fill-pen 
+				"pen" pen 
+				"line-width" line-width
+			]
 		]
 		actors: object [
 			on-resizing: func [face event][
-				face/pane/1/size/y: face/size/y - 20 
-				face/pane/2/size: grid/size: grid/draw/9: canvas/size: edit1/size: edit2/size: edit3/size: face/size - 150x20
+				shapes/size/y: face/size/y - 20 
+				drawing/size: grid/size: grid/draw/9: canvas/size: edit1/size: edit2/size: edit3/size: face/size - 150x20
 				upper/size: face/size - 20
 				h1/3/x: h3/3/x: h3/3/x: edit3/size/x
 				v1/3/y: v3/3/y: v3/3/y: edit3/size/y
@@ -866,6 +893,15 @@ ctx: context [
 					grid-off [grid/visible?: no change/part find face/menu/4 "Grid off" ["Grid on" grid-on] 2]
 					grid-on [grid/visible?: yes change/part find face/menu/4 "Grid on" ["Grid off" grid-off] 2]
 					edit-grid []; TBD
+					
+					;backdrop [drawing/color: select-color]
+					fill-pen [color: select-color foreach shape shapes/pane [shape/draw/fill-pen: color]]
+					pen [color: select-color foreach shape shapes/pane [shape/draw/pen: color]]
+					line-width [
+						lw: 1 
+						view/flags [field "2" 30 focus [also lw: face/data unview]][modal popup]
+						foreach shape shapes/pane [shape/draw/line-width: lw]
+					]
 				]
 			]
 		]
