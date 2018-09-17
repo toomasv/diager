@@ -1,12 +1,14 @@
 Red [
 	Author: "Toomas Vooglaid"
 	Date: 2018-08-24
-	Changed: 2018-09-15
+	Changed: 2018-09-17
 	Purpose: {Simple interactive diagramming tool}
 ]
 do %../drawing/pallette1.red
 ctx: context [
-	s: h1: h2: h3: v1: v2: v3: diff: df: pos1: pos2: pos3: lw: none
+	s: h1: h2: h3: v1: v2: v3: diff: df: pos1: pos2: pos3: lw: point-idx: le: none
+	df-points: copy []
+	ctrl-points: copy []
 	short-text: function [title-text /htext hint-text][
 		view/flags [
 			title title-text 
@@ -41,9 +43,10 @@ ctx: context [
 	ask-long-text: does [long-text "Enter text"]
 	text-box: make face! [type: 'box]
 	last-text: none
+	text-size: func [text][size-text/with text-box text]
 	text-pos: func [ser /local sz ofs wc hc out][
 		last-text: ask-long-text
-		sz: size-text/with text-box last-text
+		sz: text-size last-text; size-text/with text-box last-text
 		ofs: s/2
 		out: switch ser/1 [
 			box [
@@ -116,17 +119,31 @@ ctx: context [
 					])(append/only out ser) | skip]
 				]
 			]
+			text [
+				parse head s [
+					some [ser: if (ser = s) 3 skip | ser: pair! if (all [
+						not ser/-2 = 'ellipse
+						within? ser/1 s/2 - 2 (text-size s/3) + 5
+					])(append/only out ser) | skip]
+				]
+			]
 		]
 		out
 	]
 	connected: none
 	filename: none
-	select-size: func [s][
-		either s/1 = 'circle [
-			either attempt [s/2 = s/5][12][9]
-		][
-			select [box 10 ellipse 9 polygon 11 line 11 text 9] s/1 ; translate 9
-		]
+	line-rule: [['line | 'spline] some pair! opt ['transform 6 skip] le:]
+	select-size: func [s][ ; TBD arrows
+		switch/default s/1 [
+			circle [
+				either attempt [s/2 = s/5][12][9]
+			]
+			line spline [
+				parse s line-rule
+				len: (index? le) - (index? s)
+				either block? s/-1 [len + 13][len + 6]
+			]
+		][select [box 10 ellipse 9 polygon 11 text 9] s/1] ; translate 9
 	]
 	follow: function [series pos /part size /abs ][
 		if integer? pos [
@@ -143,18 +160,29 @@ ctx: context [
 			][
 				move/part series s: pos size
 			]
-		]
-		s
+		] s
+	]
+	at-distance-from-line?: function [point line-start line-end distance][
+		offset-line: line-end - line-start 
+		offset-point: point - line-start 
+		angle-line: arctangent2 offset-line/y offset-line/x 
+		angle-point: arctangent2 offset-point/y offset-point/x 
+		angle: angle-point - angle-line 
+		length-line: sqrt (offset-line/x ** 2) + (offset-line/y ** 2) 
+		length-hypotenuse: sqrt (offset-point/x ** 2) + (offset-point/y ** 2) 
+		length-opposite-side: absolute angle * length-hypotenuse 
+		length-adjacent-side: sqrt (length-hypotenuse ** 2) - (length-opposite-side ** 2) 
+		all [length-adjacent-side >= 0 length-adjacent-side <= length-line length-opposite-side <= distance]
 	]
 	view/no-wait/flags/options lay: layout [
 		backdrop rebolor 
 		shapes: panel 120x420 [
-			; Left-hand exemplary shapes
+			; Left-hand shape species
 			style _shape: box 102x62
 				with [
 					menu: ["fill-pen" fill-pen "pen" pen "line-width" line-width]
 					actors: object [
-						on-menu: func [face event] copy/deep [
+						on-menu: func [face event] [;copy/deep 
 							switch event/picked [
 								fill-pen [face/draw/fill-pen: select-color]
 								pen [face/draw/pen: select-color]
@@ -163,25 +191,98 @@ ctx: context [
 									view/flags [field "2" 30 focus [also lw: face/data unview]][modal popup]
 									face/draw/line-width: lw
 								]
+								e-arrow [
+									if pair? last face/draw [
+										append face/draw compose/deep [
+											;rotate 0 (face/draw/(-1 + length? face/draw)) [triangle (end: last face/draw) (end - 10x5) (end - 10x-5)]
+											transform 0x0 0 1 1 100x5 [shape [move -10x-5 line 0x0 -10x5]]
+										]
+										change/part at face/menu 7 ["wo end arrow" woe-arrow] 2
+										if face/menu/10 = 'wos-arrow [
+											change/part at face/menu 11 ["wo end/start arrows" wose-arrow] 2
+										]
+									]
+								]
+								s-arrow [
+									if 'line = face/draw/7 [
+										insert at face/draw 7 compose/deep [
+											;rotate 0 (face/draw/9) [triangle (end: face/draw/8) (end + 10x5) (end + 10x-5)]
+											transform 0x0 0 1 1 0x5 [shape [move 10x-5 line 0x0 10x5]]
+										]
+										change/part at face/menu 9 ["wo start arrow" wos-arrow] 2
+										if face/menu/8 = 'woe-arrow [
+											change/part at face/menu 11 ["wo end/start arrows" wose-arrow] 2
+										]
+									]
+								]
+								se-arrow [
+									case/all [
+										pair? last face/draw [
+											append face/draw compose/deep [
+												;rotate 0 (face/draw/(-1 + length? face/draw)) [triangle (end: last face/draw) (end - 10x5) (end - 10x-5)]
+												transform 0x0 0 1 1 100x5 [shape [move -10x-5 line 0x0 -10x5]]
+											]
+										]
+										'line = face/draw/7 [
+											insert at face/draw 7 compose/deep [
+												;rotate 0 (face/draw/9) [triangle (end: face/draw/8) (end + 10x5) (end + 10x-5)]
+												transform 0x0 0 1 1 0x5 [shape [move 10x-5 line 0x0 10x5]]
+											]
+										]
+									]
+									change/part at face/menu 7 ["wo end arrow" woe-arrow "wo start arrow" wos-arrow "wo end/start arrows" wose-arrow] 6
+								]
+								woe-arrow [
+									if block? last face/draw [
+										clear find/last face/draw 'transform
+										change/part at face/menu 7 ["end arrow" e-arrow] 2
+										if face/menu/12 = 'wose-arrow [
+											change/part at face/menu 11 ["end/start arrows" se-arrow] 2
+										]
+									]
+								]
+								wos-arrow [
+									if 'transform = face/draw/7 [
+										change/part at face/draw 7 [] 7
+										change/part at face/menu 9 ["start arrow" s-arrow] 2
+										if face/menu/12 = 'wose-arrow [
+											change/part at face/menu 11 ["end/start arrows" se-arrow] 2
+										]
+									]
+								]
+								wose-arrow [
+									case/all [
+										block? last face/draw [
+											clear find/last face/draw 'transform
+										]
+										'transform = face/draw/7 [
+											change/part at face/draw 7 [] 7
+										]
+									]
+									change/part at face/menu 7 ["end arrow" e-arrow "start arrow" s-arrow "end/start arrows" se-arrow] 6
+								]
 							]
 							'done
 						]
 						on-down: func [face event] [
-							append upper/pane layout/only compose/deep [
-								at (face/offset + 5) base (face/extra/size) transparent loose 
-									;extra [(face/draw)]
-									draw [(face/draw)]
+							append upper/pane layout/only compose/deep/only [
+								at (face/offset + 5) base (face/extra/size) glass loose
+									draw (face/draw)
 									on-up [
+										; Append to canvas only if released upon working area...
 										if face/offset/x > 130 [
-											append canvas/draw head change at copy/deep face/draw (face/extra/pos) reduce [(face/extra/calc)]
+											; append from beginning but change offsets according to calc in each shapes' extra block
+											append canvas/draw head change at copy/deep face/draw (face/extra/pos) reduce (face/extra/calc)
 										]
+										;... otherwise just unselect (clear transport layer)
 										clear upper/pane
+										; Make transport layer unresponsive
 										upper/color: transparent
 										;set-focus canvas
 									]
 									on-drag [face/offset: either event/ctrl? [round/to face/offset 10][face/offset]]
 							]
-							; Make layer responsive
+							; Make transport layer responsive
 							upper/color: 0.0.0.254
 						]
 					]
@@ -196,14 +297,32 @@ ctx: context [
 			; Diamond
 			;_shape draw [fill-pen snow pen black line-width 1 translate 0x0 [shape [move 30x0 line 60x30 30x60 0x30]]]
 			_shape draw [fill-pen snow pen black line-width 1 polygon 30x0 60x30 30x60 0x30]
-				extra [size 61x61 pos 8 calc [df: face/offset - 100x0 df + 30x30 df + 0x60 df + -30x30]]
+				extra [size 61x61 pos 8 calc [beg: face/offset - 100x0 beg + 30x30 beg + 0x60 beg + -30x30]]
 			; Circle
 			_shape draw [fill-pen snow pen black line-width 1 circle 30x30 30]
 				extra [size 61x61 pos 8 calc [face/offset - 100x-30]]
 			; Double circle
 			_shape draw [fill-pen snow pen black line-width 1 circle 30x30 30 circle 30x30 27]
 				extra [size 61x61 pos 8 calc [face/offset - 100x-30 30 'circle face/offset - 100x-30]]
-			do [foreach-face self [face/offset/x: 120 - face/extra/size/x / 2]]
+			; Line / Arrow
+			_shape snow draw [fill-pen black pen black line-width 1 line 0x5 100x5]
+				with [
+					append menu ["end arrow" e-arrow "start arrow" s-arrow "end/start arrows" se-arrow]
+					extra: [size 101x11 pos 7 calc ;[beg: face/offset - 130x-5 beg + 100x0]]
+						(parse face/draw [
+							thru ['line-width integer!]
+							collect [
+								opt ['transform keep (to-lit-word 'transform) keep skip keep skip keep skip keep skip skip keep (face/offset - 130x-5) keep skip]
+								'line keep (to-lit-word 'line) skip keep (p1: face/offset - 130x-5) skip keep (p1 + 100x0)
+								opt ['transform keep (to-lit-word 'transform) keep skip keep skip keep skip keep skip skip keep (p1 + 100x0) keep skip]
+							]
+						])
+					]
+				]
+			do [
+				;probe self/pane/(length? self/pane)/extra
+				foreach-face self [face/offset/x: 120 - face/extra/size/x / 2]
+			]
 		] 
 		drawing: panel white 620x420 [
 			at 0x0 grid: box 620x420 draw [
@@ -233,22 +352,25 @@ ctx: context [
 						if (
 							within? event/offset as-pair p4/x p1/y as-pair p2/x - p4/x + 1 p3/y - p1/y + 1
 						)(len: 5) break
-					|	['line | 'spline] set p1 pair! set p2 pair! set p3 pair! set p4 pair!
+					|	['line | 'spline] copy points some pair! 
 						if (
-							any [
-								within? event/offset (min p1 p2) - 2 (absolute p2 - p1) + 5
-								within? event/offset (min p2 p3) - 2 (absolute p3 - p2) + 5
-								within? event/offset (min p3 p4) - 2 (absolute p4 - p3) + 5
+							is-within?: no
+							while [1 < length? points][
+								either at-distance-from-line? event/offset points/1 points/2 3 [is-within?: true break][points: next points]
 							]
-						)(len: 5) break
+							is-within?
+						)(
+							points: parse at s 2 [collect some keep pair!]
+							len: 1 + length? points
+						) break
 					| 	'text set start pair! set txt string!
-						if (within? event/offset start size-text/with text-box txt) (len: 3) break
+						if (within? event/offset start text-size txt) (len: 3) break  ; size-text/with text-box txt
 					|	skip
 					]]
 					either event/shift? [
 						ofs: either event/ctrl? [round/to event/offset 10][event/offset]
 						append face/draw compose/deep [
-							fill-pen transparent pen black line-width 1 line (ofs) (ofs) (ofs) (ofs)
+							fill-pen black pen black line-width 1 line (ofs) (ofs) (ofs) (ofs)
 						]
 						dlen: length? face/draw
 						start?: yes
@@ -261,7 +383,16 @@ ctx: context [
 							]
 							ellipse [append edit2/draw compose [circle (start) 5 circle (start + size) 5]]
 							polygon [append edit2/draw compose [circle (p1) 5 circle (p2) 5 circle (p3) 5 circle (p4) 5]]
-							line spline [append edit2/draw compose [circle (p1) 5 circle (p2) 5 circle (p3) 5 circle (p4) 5]]
+							line spline [
+								clear ctrl-points 
+								foreach point points [append ctrl-points compose [circle (point) 5]] 
+								append edit2/draw ctrl-points
+								points: head points
+								change/part at edit1/menu/10 5 either wos: block? s/-1 [["wo start arrow" wos-arrow]][["start arrow" s-arrow]] 2
+								change/part at edit1/menu/10 7 either woe: 'transform = probe s/(2 + length? points) [["wo end arrow" woe-arrow]][["end arrow" e-arrow]] 2
+								change/part at edit1/menu/10 9 either all [wos woe] [["wo start/end arrow" wose-arrow]][["start/end arrow" se-arrow]] 2
+							]
+							;text []
 						]
 					]
 					;probe "s2" probe s
@@ -414,14 +545,26 @@ ctx: context [
 					]
 					; In case of lines register segments
 					line spline [
-						case [
-							within? event/offset (min p1 p2) - 7 (absolute p2 - p1) + 15 [face/extra/1: min p1 p2 face/extra/2: max p1 p2]
-							within? event/offset (min p2 p3) - 7 (absolute p3 - p2) + 15 [face/extra/1: min p2 p3 face/extra/2: max p2 p3]
-							within? event/offset (min p3 p4) - 7 (absolute p4 - p3) + 15 [face/extra/1: min p3 p4 face/extra/2: max p3 p4]
+						;points: copy at face/draw 8
+						clear df-points
+						forall points [append df-points pos3 - points/1]
+						forall points [
+							if all [
+								1 < length? points 
+								at-distance-from-line? event/offset points/1 points/2 7
+							][
+								point-idx: index? points
+								;face/extra/1: min points/1 points/2 
+								;face/extra/2: max points/1 points/2
+								break
+							]
 						]
+						points: head points
 					]
 				]
-				unless find [line spline] face/draw/7 [
+				either find [line spline] face/draw/7 [
+					;???
+				][
 					connected: gather s
 				]
 				edit3/visible?: yes
@@ -430,64 +573,70 @@ ctx: context [
 				if event/down? [
 					either find [line spline] s/1 [
 						;df: either event/ctrl? [round/to event/offset 10][event/offset]
-						df2: pos3 - s/2 df3: pos3 - s/3
-						df3: pos3 - s/3 df4: pos3 - s/4
-						df4: pos3 - s/4 df5: pos3 - s/5
 						pos3: either event/ctrl? [round/to event/offset 5][event/offset]
 						case [
-							; Control-points are replaced by circles
-							;within? event/offset s/2 - 5 11x11 [face/draw/8: s/2: either event/ctrl? [round/to event/offset 5][event/offset]]
-							;within? event/offset s/3 - 5 11x11 [face/draw/9: s/3: either event/ctrl? [round/to event/offset 5][event/offset]]
-							;within? event/offset s/4 - 5 11x11 [face/draw/10: s/4: either event/ctrl? [round/to event/offset 5][event/offset]]
-							;within? event/offset s/5 - 5 11x11 [face/draw/11: s/5: either event/ctrl? [round/to event/offset 5][event/offset]]
-							
-							; First segment
-							within? event/offset (min s/2 s/3) - 7 (absolute s/3 - s/2) + 15 [
-								case [
-									; horizontal
-									s/2/x = s/3/x [
-										face/draw/8/x: face/draw/9/x: s/2/x: s/3/x: edit2/draw/8/x: edit2/draw/11/x: pos3/x
+							s/(1 + point-idx)/x = s/(2 + point-idx)/x [dim: 'x ortho?: yes] ; veritcal line - horizontal move
+							s/(1 + point-idx)/y = s/(2 + point-idx)/y [dim: 'y ortho?: yes] ; horizontal line - vertical move
+							'else [ortho?: no]
+						]
+						case [
+							ortho? [
+								face/draw/(7 + point-idx)/:dim: 
+								face/draw/(8 + point-idx)/:dim: 
+								s/(1 + point-idx)/:dim: 
+								s/(2 + point-idx)/:dim: 
+								edit2/draw/(point-idx - 1 * 3 + 1 + 7)/:dim: 
+								edit2/draw/(point-idx * 3 + 1 + 7)/:dim: 
+								points/:point-idx/:dim:
+								points/(point-idx + 1)/:dim:
+									pos3/:dim
+								case/all [
+									all [1 = point-idx block? s/-1][s/-2/:dim: pos3/:dim]
+									all [2 = point-idx block? s/-1][
+										ang: s/3 - s/2
+										; compute angle of arrowhead
+										s/-5: 180 / pi * arctangent2 ang/y ang/x
 									]
-									; vertical
-									s/2/y = s/3/y [
-										face/draw/8/y: face/draw/9/y: s/2/y: s/3/y: edit2/draw/8/y: edit2/draw/11/y: pos3/y
-									]
-									; slanted
-									'else [
-										face/draw/8: s/2: edit2/draw/8: pos3 - df2
-										face/draw/9: s/3: edit2/draw/11: pos3 - df3
-									]
-								]
-							]
-							; Second segment
-							within? event/offset (min s/3 s/4) - 7 (absolute s/4 - s/3) + 15 [
-								case [
-									s/3/x = s/4/x [
-										face/draw/9/x: face/draw/10/x: s/3/x: s/4/x: edit2/draw/11/x: edit2/draw/14/x: pos3/x
-									]
-									s/3/y = s/4/y [
-										face/draw/9/y: face/draw/10/y: s/3/y: s/4/y: edit2/draw/11/y: edit2/draw/14/y: pos3/y
-									]
-									'else [
-										face/draw/9: s/3: edit2/draw/11: pos3 - df3
-										face/draw/10: s/4: edit2/draw/14: pos3 - df4
+									all [
+										point-idx + 1 = length? points
+										'transform = s/(len: -5 + length? face/draw)
+									][s/(len + 5)/:dim: pos3/:dim]
+									all [
+										(length? points) - point-idx = 2
+										'transform = s/(len: 2 + length? points)
+									][	
+										ang: s/(point-idx + 3) - s/(point-idx + 2)
+										s/(len + 2): 180 / pi * arctangent2 ang/y ang/x
 									]
 								]
 							]
-							; Third segment
-							within? event/offset (min s/4 s/5) - 7 (absolute s/5 - s/4) + 15 [
-								case [
-									s/4/x = s/5/x [
-										face/draw/10/x: face/draw/11/x: s/4/x: s/5/x: edit2/draw/14/x: edit2/draw/17/x: pos3/x
+							; slanted  probe
+							'else [
+								face/draw/(7 + point-idx): s/(1 + point-idx): edit2/draw/(point-idx - 1 * 3 + 1 + 7): pos3 - df-points/:point-idx
+								face/draw/(8 + point-idx): s/(2 + point-idx): edit2/draw/(point-idx * 3 + 1 + 7): pos3 - df-points/(point-idx + 1)
+								case/all [
+									all [1 = point-idx block? s/-1] [s/-2: s/2]
+									all [2 = point-idx block? s/-1][
+										ang: s/3 - s/2
+										; compute angle of arrowhead
+										s/-5: 180 / pi * arctangent2 ang/y ang/x
 									]
-									s/4/y = s/5/y [
-										face/draw/10/y: face/draw/11/y: s/4/y: s/5/y: edit2/draw/14/y: edit2/draw/17/y: pos3/y
+									all [
+										point-idx + 1 = length? points
+										'transform = s/(len: point-idx + 3)
+									][
+										s/(len + 5): s/(point-idx + 2)
 									]
-									'else [
-										face/draw/10: s/4: edit2/draw/14: pos3 - df4
-										face/draw/11: s/5: edit2/draw/17: pos3 - df5
+									all [
+										(length? points) - point-idx = 2
+										'transform = s/(len: 2 + length? points)
+									][	
+										ang: s/(point-idx + 3) - s/(point-idx + 2)
+										s/(len + 2): 180 / pi * arctangent2 ang/y ang/x
 									]
-								]
+								] 
+								points/:point-idx: s/(point-idx + 1)
+								points/(point-idx + 1): s/(point-idx + 2)
 							]
 						]
 					][
@@ -691,6 +840,7 @@ ctx: context [
 							]
 							text [
 								face/draw/8: s/2: df
+								unless event/shift? [forall connected [change connected/1 connected/1/1 + pos3diff]]
 							]
 						]
 						pos3: diff;event/offset ;
@@ -707,8 +857,9 @@ ctx: context [
 					"connector" [
 						"line" line 
 						"spline" spline
-						"start-arrow" sarrow ; TBD
-						"end-arrow" earrow ; TBD
+						"start-arrow" s-arrow ; TBD
+						"end-arrow" e-arrow ; TBD
+						"start/end arrow" se-arrow
 					]
 					"delete" delete
 					"order" [
@@ -721,22 +872,92 @@ ctx: context [
 			]
 			on-menu [
 				switch event/picked [
-					fill-pen [change skip s -5 select-color]
-					pen [change skip s -3 select-color]
+					fill-pen [change skip s either all [find [line spline] s/1 block? s/-1][-12][-5] select-color]
+					pen [change skip s either all [find [line spline] s/1 block? s/-1][-10][-3] select-color]
 					line-width [
-						view/flags [field "2" 30 focus [also change back s face/data unview]][modal popup]
+						view/flags [field "2" 30 focus [also change skip s either all [find [line spline] s/1 block? s/-1][-8][-1] face/data unview]][modal popup]
 					]
 					text [append s compose [fill-pen snow pen black line-width 1 text (text-pos s) (last-text)]]
 					spline [edit1/draw/7: 'spline change s 'spline]
 					line [edit1/draw/7: 'line change s 'line]
-					sarrow [] ; TBD
-					earrow [
-						
+					e-arrow [
+						if 'transform <> s/(2 + length? points) [
+							ang: (last points) - (first skip tail points -2)
+							insert at s 2 + length? points compose [
+								transform 0x0 (180 / pi * arctangent2 ang/y ang/x) 1 1 (s/(1 + length?  points)) [shape [move -10x-5 line 0x0 -10x5]]
+							]
+							change/part at face/menu/10 7 ["wo end arrow" woe-arrow] 2
+							if face/menu/10/6 = 'wos-arrow [
+								change/part at face/menu/10 9 ["wo end/start arrows" wose-arrow] 2
+							]
+						]
+					]
+					s-arrow [
+						if not block? s/-1 [
+							ang: s/3 - s/2
+							insert s compose [
+								transform 0x0 (180 / pi * arctangent2 ang/y ang/x) 1 1 (s/2) [shape [move 10x-5 line 0x0 10x5]]
+							]
+							s: skip s 7
+							change/part at face/menu/10 5 ["wo start arrow" wos-arrow] 2
+							if face/menu/10/8 = 'woe-arrow [
+								change/part at face/menu/10 9 ["wo end/start arrows" wose-arrow] 2
+							]
+						]
+					]
+					se-arrow [
+						case/all [
+							'transform <> s/(2 + length? points) [
+								ang: (last points) - (first skip tail points -2)
+								insert at s 2 + length? points compose [
+									transform 0x0 (180 / pi * arctangent2 ang/y ang/x) 1 1 (s/(1 + length?  points)) [shape [move -10x-5 line 0x0 -10x5]]
+								]
+							]
+							not block? s/-1 [
+								ang: s/3 - s/2
+								insert s compose [
+									transform 0x0 (180 / pi * arctangent2 ang/y ang/x) 1 1 (s/2) [shape [move 10x-5 line 0x0 10x5]]
+								]
+								s: skip s 7
+							]
+						]
+						change/part at face/menu/10 5 ["wo start arrow" wos-arrow "wo end arrow" woe-arrow "wo end/start arrows" wose-arrow] 6
+					]
+					woe-arrow [
+						if 'transform = s/(2 + length? points) [
+							change/part at s (2 + length? points) [] 7
+							change/part at face/menu/10 7 ["end arrow" e-arrow] 2
+							if face/menu/10/10 = 'wose-arrow [
+								change/part at face/menu/10 9 ["end/start arrows" se-arrow] 2
+							]
+						]
+					]
+					wos-arrow [
+						if block? s/-1 [
+							change/part at s -7 [] 7
+							change/part at face/menu/10 5 ["start arrow" s-arrow] 2
+							s: skip s -7
+							if face/menu/10/10 = 'wose-arrow [
+								change/part at face/menu/10 9 ["end/start arrows" se-arrow] 2
+							]
+						]
+					]
+					wose-arrow [
+						case/all [
+							'transform = s/(2 + length? points) [
+								change/part at s (2 + length? points) [] 7
+							]
+							block? s/-1 [
+								change/part at s -7 [] 7
+								s: skip s -7
+							]
+						]
+						change/part at face/menu/10 5 ["start arrow" s-arrow "end arrow" e-arrow "end/start arrows" se-arrow] 6
 					]
 					delete [
 						clear at edit1/draw 7 
 						clear at edit2/draw 7 
-						change/part skip s -6 [] select-size s
+						change/part skip s either all [find [line spline] s/1 block? s/-1][-13][-6] [] select-size s 
 					]
 					back [s: skip follow/part skip s -6 'head select-size s 6]
 					backward [
@@ -790,7 +1011,8 @@ ctx: context [
 						forall points [
 							if 5 >= sqrt add power first ds: pos1 - points/1 2 power second ds 2 [
 								i: index? points 
-								face/extra: reduce [1 + i 7 + i 7 + (i - 1 * 3 + 1)]
+								; register offsets of the point for s, edit1 and edit2
+								face/extra: reduce [1 + i    7 + i    7 + (i - 1 * 3 + 1)]
 							]
 						]
 					)
@@ -855,7 +1077,43 @@ ctx: context [
 							v2/2/x: v2/3/x: s/2/x
 						]
 						line spline [
-							s/(face/extra/1): edit1/draw/(face/extra/2): edit2/draw/(face/extra/3): pos3
+							; use offsets registered on `down`-event
+							s/(face/extra/1): edit1/draw/(face/extra/2): edit2/draw/(face/extra/3): points/(face/extra/1 - 1): pos3
+							; check for arrowheads
+							case/all [
+								; first point
+								all [2 = face/extra/1 block? s/-1] [
+									; set rotation center (because first point was just moved)
+									s/-2: s/2 
+									; set offset of second point
+									ang: s/3 - s/2
+									; compute angle of arrowhead
+									s/-5: 180 / pi * arctangent2 ang/y ang/x
+								]
+								; second point
+								all [3 = face/extra/1 block? s/-1] [
+									ang: s/3 - s/2
+									s/-5: 180 / pi * arctangent2 ang/y ang/x
+								]
+								; last point
+								all [
+									face/extra/1 - 1 = length? points
+									'transform = s/(len: face/extra/1 + 1)
+								][
+									; adjust rotation center (because last point was just moved)
+									s/(len + 5): s/(face/extra/1)
+									ang: s/(face/extra/1) - s/(face/extra/1 - 1)
+									s/(len + 2): 180 / pi * arctangent2 ang/y ang/x
+								]
+								; penultimate point
+								all [
+									face/extra/1 = length? points
+									'transform = s/(len: face/extra/1 + 2)
+								][
+									ang: s/(face/extra/1 + 1) - s/(face/extra/1)
+									s/(len + 2): 180 / pi * arctangent2 ang/y ang/x
+								]
+							]
 						]
 					]
 				]
