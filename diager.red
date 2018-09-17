@@ -130,7 +130,50 @@ ctx: context [
 		]
 		out
 	]
+	get-angle: func [ang][180 / pi * arctangent2 ang/y ang/x]
 	connected: none
+	move-connected: func [p3d][
+		forall connected [
+			either all [
+				any [
+					find [line spline] connected/1/-1
+					parse skip connected/1 -2 [some [l: ['line | 'spline] to end | pair! (l: back l) :l | reject]]
+				]
+				any [
+					; start- arrow
+					block? connected/1/-2
+					'transform = connected/1/3
+					; end-arrow
+					'transform = connected/1/2
+					block? connected/1/-3
+				]
+			][
+				; transform's offset is changed already (catched automatically)
+				; but we have to change line's point manually because we have intercepted this
+				change connected/1 connected/1/1 + p3d
+				case/all [
+					block? connected/1/-2 [
+						ang: connected/1/2 - connected/1/1
+						connected/1/-6: get-angle ang
+					]
+					'transform = connected/1/3 [
+						ang: connected/1/2 - connected/1/1
+						connected/1/5: get-angle ang					
+					]
+					'transform = connected/1/2 [
+						ang: connected/1/1 - connected/1/-1
+						connected/1/4: get-angle ang
+					]
+					block? connected/1/-3 [
+						ang: connected/1/1 - connected/1/-1
+						connected/1/-7: get-angle ang
+					]
+				]
+			][
+				change connected/1 connected/1/1 + p3d
+			]
+		]
+	]
 	filename: none
 	line-rule: [['line | 'spline] some pair! opt ['transform 6 skip] le:]
 	select-size: func [s][ ; TBD arrows
@@ -389,7 +432,7 @@ ctx: context [
 								append edit2/draw ctrl-points
 								points: head points
 								change/part at edit1/menu/10 5 either wos: block? s/-1 [["wo start arrow" wos-arrow]][["start arrow" s-arrow]] 2
-								change/part at edit1/menu/10 7 either woe: 'transform = probe s/(2 + length? points) [["wo end arrow" woe-arrow]][["end arrow" e-arrow]] 2
+								change/part at edit1/menu/10 7 either woe: 'transform = s/(2 + length? points) [["wo end arrow" woe-arrow]][["end arrow" e-arrow]] 2
 								change/part at edit1/menu/10 9 either all [wos woe] [["wo start/end arrow" wose-arrow]][["start/end arrow" se-arrow]] 2
 							]
 							;text []
@@ -453,6 +496,23 @@ ctx: context [
 							][
 								[pos1 - 100x-30]
 							]
+						]
+						transform [
+							(parse at face/pane/1/draw 8 [
+								collect [
+									keep skip keep skip keep skip keep skip skip keep (p1: pos1 - 130x0) keep skip
+									'line keep (to-lit-word 'line) skip keep (p1) skip keep (p1 + 100x0)
+									opt ['transform keep (to-lit-word 'transform) keep skip keep skip keep skip keep skip skip keep (p1 + 100x0) keep skip]
+								]
+							])
+						]
+						line [
+							(parse at face/pane/1/draw 8 [
+								collect [
+									skip keep (p1: pos1 - 130x0) skip keep (p1 + 100x0)
+									opt ['transform keep (to-lit-word 'transform) keep skip keep skip keep skip keep skip skip keep (p1 + 100x0) keep skip]
+								]
+							])
 						]
 					] 
 				][
@@ -595,7 +655,7 @@ ctx: context [
 									all [2 = point-idx block? s/-1][
 										ang: s/3 - s/2
 										; compute angle of arrowhead
-										s/-5: 180 / pi * arctangent2 ang/y ang/x
+										s/-5: get-angle ang
 									]
 									all [
 										point-idx + 1 = length? points
@@ -606,7 +666,7 @@ ctx: context [
 										'transform = s/(len: 2 + length? points)
 									][	
 										ang: s/(point-idx + 3) - s/(point-idx + 2)
-										s/(len + 2): 180 / pi * arctangent2 ang/y ang/x
+										s/(len + 2): get-angle ang
 									]
 								]
 							]
@@ -619,7 +679,7 @@ ctx: context [
 									all [2 = point-idx block? s/-1][
 										ang: s/3 - s/2
 										; compute angle of arrowhead
-										s/-5: 180 / pi * arctangent2 ang/y ang/x
+										s/-5: get-angle ang
 									]
 									all [
 										point-idx + 1 = length? points
@@ -632,7 +692,7 @@ ctx: context [
 										'transform = s/(len: 2 + length? points)
 									][	
 										ang: s/(point-idx + 3) - s/(point-idx + 2)
-										s/(len + 2): 180 / pi * arctangent2 ang/y ang/x
+										s/(len + 2): get-angle ang
 									]
 								] 
 								points/:point-idx: s/(point-idx + 1)
@@ -708,7 +768,7 @@ ctx: context [
 										v1/2/x: v1/3/x: s/2/x
 										v3/2/x: v3/3/x: s/3/x
 										v2/2/x: v2/3/x: s/3/x - s/2/x / 2 + s/2/x
-										unless event/shift? [forall connected [change connected/1 connected/1/1 + pos3diff]]
+										unless event/shift? [move-connected pos3diff]
 									]
 								]
 							]
@@ -763,7 +823,7 @@ ctx: context [
 										v3/2/x: v3/3/x: s/2/x + s/3/x
 										v2/2/x: v2/3/x: s/3/x / 2 + s/2/x
 										unless event/shift? [
-											forall connected [change connected/1 connected/1/1 + pos3diff]
+											forall connected [move-connected pos3diff]
 										]
 									]
 								]
@@ -781,7 +841,9 @@ ctx: context [
 											face/draw/11: s/5: df
 										]
 										face/draw/8: s/2: df 
-										unless event/shift? [forall connected [change connected/1 connected/1/1 + pos3diff]]
+										unless event/shift? [
+											forall connected [move-connected pos3diff]
+										]
 									]
 								]
 								h1/2/y: h1/3/y: s/2/y - s/3
@@ -836,11 +898,11 @@ ctx: context [
 								v1/2/x: v1/3/x: s/5/x
 								v2/2/x: v2/3/x: s/2/x
 								v3/2/x: v3/3/x: s/3/x
-								unless event/shift? [forall connected [change connected/1 connected/1/1 + pos3diff]]
+								unless event/shift? [move-connected pos3diff]
 							]
 							text [
 								face/draw/8: s/2: df
-								unless event/shift? [forall connected [change connected/1 connected/1/1 + pos3diff]]
+								unless event/shift? [move-connected pos3diff]
 							]
 						]
 						pos3: diff;event/offset ;
@@ -884,7 +946,7 @@ ctx: context [
 						if 'transform <> s/(2 + length? points) [
 							ang: (last points) - (first skip tail points -2)
 							insert at s 2 + length? points compose [
-								transform 0x0 (180 / pi * arctangent2 ang/y ang/x) 1 1 (s/(1 + length?  points)) [shape [move -10x-5 line 0x0 -10x5]]
+								transform 0x0 (get-angle ang) 1 1 (s/(1 + length?  points)) [shape [move -10x-5 line 0x0 -10x5]]
 							]
 							change/part at face/menu/10 7 ["wo end arrow" woe-arrow] 2
 							if face/menu/10/6 = 'wos-arrow [
@@ -896,7 +958,7 @@ ctx: context [
 						if not block? s/-1 [
 							ang: s/3 - s/2
 							insert s compose [
-								transform 0x0 (180 / pi * arctangent2 ang/y ang/x) 1 1 (s/2) [shape [move 10x-5 line 0x0 10x5]]
+								transform 0x0 (get-angle ang) 1 1 (s/2) [shape [move 10x-5 line 0x0 10x5]]
 							]
 							s: skip s 7
 							change/part at face/menu/10 5 ["wo start arrow" wos-arrow] 2
@@ -910,13 +972,13 @@ ctx: context [
 							'transform <> s/(2 + length? points) [
 								ang: (last points) - (first skip tail points -2)
 								insert at s 2 + length? points compose [
-									transform 0x0 (180 / pi * arctangent2 ang/y ang/x) 1 1 (s/(1 + length?  points)) [shape [move -10x-5 line 0x0 -10x5]]
+									transform 0x0 (get-angle ang) 1 1 (s/(1 + length?  points)) [shape [move -10x-5 line 0x0 -10x5]]
 								]
 							]
 							not block? s/-1 [
 								ang: s/3 - s/2
 								insert s compose [
-									transform 0x0 (180 / pi * arctangent2 ang/y ang/x) 1 1 (s/2) [shape [move 10x-5 line 0x0 10x5]]
+									transform 0x0 (get-angle ang) 1 1 (s/2) [shape [move 10x-5 line 0x0 10x5]]
 								]
 								s: skip s 7
 							]
@@ -1088,12 +1150,12 @@ ctx: context [
 									; set offset of second point
 									ang: s/3 - s/2
 									; compute angle of arrowhead
-									s/-5: 180 / pi * arctangent2 ang/y ang/x
+									s/-5: get-angle ang
 								]
 								; second point
 								all [3 = face/extra/1 block? s/-1] [
 									ang: s/3 - s/2
-									s/-5: 180 / pi * arctangent2 ang/y ang/x
+									s/-5: get-angle ang
 								]
 								; last point
 								all [
@@ -1103,7 +1165,7 @@ ctx: context [
 									; adjust rotation center (because last point was just moved)
 									s/(len + 5): s/(face/extra/1)
 									ang: s/(face/extra/1) - s/(face/extra/1 - 1)
-									s/(len + 2): 180 / pi * arctangent2 ang/y ang/x
+									s/(len + 2): get-angle ang
 								]
 								; penultimate point
 								all [
@@ -1111,7 +1173,7 @@ ctx: context [
 									'transform = s/(len: face/extra/1 + 2)
 								][
 									ang: s/(face/extra/1 + 1) - s/(face/extra/1)
-									s/(len + 2): 180 / pi * arctangent2 ang/y ang/x
+									s/(len + 2): get-angle ang
 								]
 							]
 						]
