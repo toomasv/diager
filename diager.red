@@ -1,7 +1,7 @@
 Red [
 	Author: "Toomas Vooglaid"
 	Date: 2018-08-24
-	Changed: 2018-09-17
+	Changed: 2018-09-20
 	Purpose: {Simple interactive diagramming tool}
 ]
 do %../drawing/pallette1.red
@@ -59,12 +59,6 @@ ctx: context [
 				hc: s/3/y / 2
 				as-pair s/2/x + wc - (sz/x / 2) s/2/y + hc - (sz/y / 2)
 			]
-			; Diamond representation replaced
-			;translate [
-			;	wc: s/3/2/4/x - s/3/2/6/x / 2 + s/3/2/6/x
-			;	hc: s/3/2/5/y - s/3/2/2/y / 2 + s/3/2/2/y
-			;	as-pair s/2/x + wc - (sz/x / 2) s/2/y + hc - (sz/y / 2)
-			;]
 			polygon [
 				as-pair s/2/x - (sz/x / 2) s/3/y - (sz/y / 2)
 			]			
@@ -102,20 +96,11 @@ ctx: context [
 					])(append/only out ser) | skip]				
 				]
 			]
-			comment {
-			translate [
-				parse head s [
-					some [ser: if (ser = s) 3 skip | ser: pair! if (all [
-						not ser/-2 = 'ellipse 
-						within? ser/1 -2 + s/2 + as-pair s/3/2/6/x s/3/2/2/y as-pair s/3/2/4/x - s/3/2/6/x s/3/2/5/y - s/3/2/2/y + 4
-					])(append/only out ser) | skip]
-				]
-			]}
 			polygon [
 				parse head s [
 					some [ser: if (ser = s) 5 skip | ser: pair! if (all [
 						not ser/-2 = 'ellipse 
-						within? ser/1 -2 + as-pair s/5/x s/2/y as-pair s/3/x - s/5/x + 1 s/4/y - s/2/y + 5
+						within-diamond? ser/1 s/2 - 0x2 s/3 + 2x0 s/4 + 0x2 s/5 - 2x0
 					])(append/only out ser) | skip]
 				]
 			]
@@ -176,7 +161,7 @@ ctx: context [
 	]
 	filename: none
 	line-rule: [['line | 'spline] some pair! opt ['transform 6 skip] le:]
-	select-size: func [s][ ; TBD arrows
+	select-size: func [s][ 
 		switch/default s/1 [
 			circle [
 				either attempt [s/2 = s/5][12][9]
@@ -186,7 +171,7 @@ ctx: context [
 				len: (index? le) - (index? s)
 				either block? s/-1 [len + 13][len + 6]
 			]
-		][select [box 10 ellipse 9 polygon 11 text 9] s/1] ; translate 9
+		][select [box 10 ellipse 9 polygon 11 text 9] s/1] 
 	]
 	follow: function [series pos /part size /abs ][
 		if integer? pos [
@@ -217,6 +202,50 @@ ctx: context [
 		length-adjacent-side: sqrt (length-hypotenuse ** 2) - (length-opposite-side ** 2) 
 		all [length-adjacent-side >= 0 length-adjacent-side <= length-line length-opposite-side <= distance]
 	]
+	within-diamond?: func [point t1 t2 t3 t4 /local d p][
+		all [
+			point/y >= t1/y
+			point/y <= t3/y
+			(arctangent2 second (d: t2 - t1) d/x) <= (p: arctangent2 second (p: point - t1) p/x)
+			p <= (arctangent2 second (d: t4 - t1) d/x)
+			(arctangent2 second (d: t2 - t3) d/x) >= (p: arctangent2 second (p: point - t3) p/x)
+			p >= (arctangent2 second (d: t4 - t3) d/x)
+		]
+	]
+	catch-within: func [/last][ret: [
+		some [s: ;(probe "s1" probe s probe index? s)
+			'box set start pair! set end pair! set radius integer! 
+			if (within? event/offset start end - start + 1) (len: 4) break
+		|	'ellipse set start pair! set _size pair!
+			if (within? event/offset start _size) (len: 3) break
+		|	'circle set center pair! set radius number! opt ['circle set cent2 pair!]
+			(diff: event/offset - center)
+			if (radius > sqrt add diff/x ** 2 diff/y ** 2) (len: either attempt [center = cent2] [6][3]) break
+		|	'polygon set p1 pair! set p2 pair! set p3 pair! set p4 pair!
+			if (
+				within-diamond? event/offset p1 p2 p3 p4
+			)(len: 5) break
+		|	['line | 'spline] copy points some pair! 
+			if (
+				is-within?: no
+				while [1 < length? points][
+					either at-distance-from-line? event/offset points/1 points/2 3 [is-within?: true break][points: next points]
+				]
+				is-within?
+			)(
+				points: parse at s 2 [collect some keep pair!]
+				len: 1 + length? points
+			) break
+		| 	'text set start pair! set txt string!
+			if (within? event/offset start text-size txt) (len: 3) break  ; size-text/with text-box txt
+		|	skip
+		]]
+		if last [
+			change back tail ret/2 [(s: back s) :s]
+			
+		] 
+		ret
+	]
 	view/no-wait/flags/options lay: layout [
 		backdrop rebolor 
 		shapes: panel 120x420 [
@@ -237,7 +266,6 @@ ctx: context [
 								e-arrow [
 									if pair? last face/draw [
 										append face/draw compose/deep [
-											;rotate 0 (face/draw/(-1 + length? face/draw)) [triangle (end: last face/draw) (end - 10x5) (end - 10x-5)]
 											transform 0x0 0 1 1 100x5 [shape [move -10x-5 line 0x0 -10x5]]
 										]
 										change/part at face/menu 7 ["wo end arrow" woe-arrow] 2
@@ -249,7 +277,6 @@ ctx: context [
 								s-arrow [
 									if 'line = face/draw/7 [
 										insert at face/draw 7 compose/deep [
-											;rotate 0 (face/draw/9) [triangle (end: face/draw/8) (end + 10x5) (end + 10x-5)]
 											transform 0x0 0 1 1 0x5 [shape [move 10x-5 line 0x0 10x5]]
 										]
 										change/part at face/menu 9 ["wo start arrow" wos-arrow] 2
@@ -262,13 +289,11 @@ ctx: context [
 									case/all [
 										pair? last face/draw [
 											append face/draw compose/deep [
-												;rotate 0 (face/draw/(-1 + length? face/draw)) [triangle (end: last face/draw) (end - 10x5) (end - 10x-5)]
 												transform 0x0 0 1 1 100x5 [shape [move -10x-5 line 0x0 -10x5]]
 											]
 										]
 										'line = face/draw/7 [
 											insert at face/draw 7 compose/deep [
-												;rotate 0 (face/draw/9) [triangle (end: face/draw/8) (end + 10x5) (end + 10x-5)]
 												transform 0x0 0 1 1 0x5 [shape [move 10x-5 line 0x0 10x5]]
 											]
 										]
@@ -338,7 +363,6 @@ ctx: context [
 			_shape draw [fill-pen snow pen black line-width 1 ellipse 0x0 100x60]
 				extra [size 102x62 pos 8 calc [face/offset - 130x0]]
 			; Diamond
-			;_shape draw [fill-pen snow pen black line-width 1 translate 0x0 [shape [move 30x0 line 60x30 30x60 0x30]]]
 			_shape draw [fill-pen snow pen black line-width 1 polygon 30x0 60x30 30x60 0x30]
 				extra [size 61x61 pos 8 calc [beg: face/offset - 100x0 beg + 30x30 beg + 0x60 beg + -30x30]]
 			; Circle
@@ -378,105 +402,162 @@ ctx: context [
 			]
 			
 			at 0x0 canvas: box 0.0.0.254 620x420 all-over draw []
-				on-down [
-					clear at edit1/draw 7
-					clear at edit2/draw 7
-					parse face/draw [some [s: ;(probe "s1" probe s probe index? s)
-						'box set start pair! set end pair! set radius integer! 
-						if (within? event/offset start end - start + 1) (len: 4) break
-					|	'ellipse set start pair! set size pair!
-						if (within? event/offset start size) (len: 3) break
-					|	'circle set center pair! set radius number! opt ['circle set cent2 pair!]
-						(diff: event/offset - center)
-						if (radius > sqrt add diff/x ** 2 diff/y ** 2) (len: either attempt [center = cent2] [6][3]) break
-					;|	'translate set start pair!
-					;	if (within? event/offset start as-pair s/3/2/4/x s/3/2/5/y) (len: 3) break
-					|	'polygon set p1 pair! set p2 pair! set p3 pair! set p4 pair!
-						if (
-							within? event/offset as-pair p4/x p1/y as-pair p2/x - p4/x + 1 p3/y - p1/y + 1
-						)(len: 5) break
-					|	['line | 'spline] copy points some pair! 
-						if (
-							is-within?: no
-							while [1 < length? points][
-								either at-distance-from-line? event/offset points/1 points/2 3 [is-within?: true break][points: next points]
-							]
-							is-within?
-						)(
-							points: parse at s 2 [collect some keep pair!]
-							len: 1 + length? points
-						) break
-					| 	'text set start pair! set txt string!
-						if (within? event/offset start text-size txt) (len: 3) break  ; size-text/with text-box txt
-					|	skip
-					]]
-					either event/shift? [
-						ofs: either event/ctrl? [round/to event/offset 10][event/offset]
-						append face/draw compose/deep [
-							fill-pen black pen black line-width 1 line (ofs) (ofs) (ofs) (ofs)
-						]
-						dlen: length? face/draw
-						start?: yes
-						dir: none
-					][
-						if 1 < length? s [append edit1/draw copy/deep/part s len]
-						switch s/1 [
-							box [append edit2/draw compose [
-								circle (start) 5 circle (end) 5 circle (as-pair end/x - radius start/y + radius) 3]
-							]
-							ellipse [append edit2/draw compose [circle (start) 5 circle (start + size) 5]]
-							polygon [append edit2/draw compose [circle (p1) 5 circle (p2) 5 circle (p3) 5 circle (p4) 5]]
-							line spline [
-								clear ctrl-points 
-								foreach point points [append ctrl-points compose [circle (point) 5]] 
-								append edit2/draw ctrl-points
-								points: head points
-								change/part at edit1/menu/10 5 either wos: block? s/-1 [["wo start arrow" wos-arrow]][["start arrow" s-arrow]] 2
-								change/part at edit1/menu/10 7 either woe: 'transform = s/(2 + length? points) [["wo end arrow" woe-arrow]][["end arrow" e-arrow]] 2
-								change/part at edit1/menu/10 9 either all [wos woe] [["wo start/end arrow" wose-arrow]][["start/end arrow" se-arrow]] 2
-							]
-							;text []
-						]
-					]
-					;probe "s2" probe s
-				]
-				on-over [
-					any [
-						all [
-							event/shift? event/down?
-							ofs: either event/ctrl? [round/to event/offset 10][event/offset]
-							either start? [
-								case [
-									3 < absolute face/draw/:dlen/x - ofs/x [dir: 'horizontal]
-									3 < absolute face/draw/:dlen/y - ofs/y [dir: 'vertical]
+				with [
+					actors: object [
+						on-down: func [face event] [
+							clear at edit1/draw 7
+							clear at edit2/draw 7
+							parse face/draw [
+								some [s: ;(probe "s1" probe s probe index? s)
+									'box set start pair! set end pair! set radius integer! 
+									if (within? event/offset start end - start + 1) (len: 4) break
+								|	'ellipse set start pair! set _size pair!
+									if (within? event/offset start _size) (len: 3) break
+								|	'circle set center pair! set radius number! opt ['circle set cent2 pair!]
+									(diff: event/offset - center)
+									if (radius > sqrt add diff/x ** 2 diff/y ** 2) (len: either attempt [center = cent2] [6][3]) break
+								|	'polygon set p1 pair! set p2 pair! set p3 pair! set p4 pair!
+									if (
+										within-diamond? event/offset p1 p2 p3 p4
+									)(len: 5) break
+								|	['line | 'spline] copy points some pair! 
+									if (
+										is-within?: no
+										while [1 < length? points][
+											either at-distance-from-line? event/offset points/1 points/2 3 [is-within?: true break][points: next points]
+										]
+										is-within?
+									)(
+										points: parse at s 2 [collect some keep pair!]
+										len: 1 + length? points
+									) break
+								| 	'text set start pair! set txt string!
+									if (within? event/offset start text-size txt) (len: 3) break  ; size-text/with text-box txt
+								|	skip
+								]]
+							either event/shift? [
+								ofs: either event/ctrl? [round/to event/offset 10][event/offset]
+								append face/draw compose/deep [
+									fill-pen black pen black line-width 1 line (ofs) (ofs) (ofs) (ofs)
 								]
-								either dir [start?: no][true]
+								dlen: length? face/draw
+								start?: yes
+								dir: none
 							][
-								switch dir [
-									horizontal [
-										either event/alt-down? [
-											face/draw/(dlen - 2)/x: face/draw/(dlen - 1)/x: ofs/x - face/draw/(dlen - 3)/x + face/draw/(dlen - 3)/x 
-										][
-											face/draw/(dlen - 2)/x: face/draw/(dlen - 1)/x: ofs/x - face/draw/(dlen - 3)/x / 2 + face/draw/(dlen - 3)/x 
-											face/draw/(dlen - 1)/y: ofs/y 
-										]
+								if 1 < length? s [append edit1/draw copy/deep/part s len]
+								switch s/1 [
+									box [append edit2/draw compose [
+										circle (start) 5 circle (end) 5 circle (as-pair end/x - radius start/y + radius) 3]
 									]
-									vertical [
-										either event/alt-down? [
-											face/draw/(dlen - 2)/y: face/draw/(dlen - 1)/y: ofs/y - face/draw/(dlen - 3)/y + face/draw/(dlen - 3)/y 
-										][
-											face/draw/(dlen - 2)/y: face/draw/(dlen - 1)/y: ofs/y - face/draw/(dlen - 3)/y / 2 + face/draw/(dlen - 3)/y 
-											face/draw/(dlen - 1)/x: ofs/x 
-										]
+									ellipse [append edit2/draw compose [circle (start) 5 circle (start + _size) 5]]
+									polygon [append edit2/draw compose [circle (p1) 5 circle (p2) 5 circle (p3) 5 circle (p4) 5]]
+									line spline [
+										clear ctrl-points 
+										foreach point points [append ctrl-points compose [circle (point) 5]] 
+										append edit2/draw ctrl-points
+										points: head points
+										change/part at edit1/menu/10 5 either wos: block? s/-1 [["wo start arrow" wos-arrow]][["start arrow" s-arrow]] 2
+										change/part at edit1/menu/10 7 either woe: 'transform = s/(2 + length? points) [["wo end arrow" woe-arrow]][["end arrow" e-arrow]] 2
+										change/part at edit1/menu/10 9 either all [wos woe] [["wo start/end arrow" wose-arrow]][["start/end arrow" se-arrow]] 2
 									]
+									;text []
 								]
-								face/draw/:dlen: ofs
+							]
+							;probe "s2" probe s
+						]
+						on-alt-down: func [face event /local found] [
+							found: true
+							clear at edit1/draw 7
+							clear at edit2/draw 7
+							parse tail face/draw [
+								some [s: ;(probe "s1" probe s probe index? s)
+									'box set start pair! set end pair! set radius integer! 
+									if (within? event/offset start end - start + 1) (len: 4) break
+								|	'ellipse set start pair! set _size pair!
+									if (within? event/offset start _size) (len: 3) break
+								|	'circle set center pair! set radius number! opt ['circle set cent2 pair!]
+									(diff: event/offset - center)
+									if (radius > sqrt add diff/x ** 2 diff/y ** 2) (len: either attempt [center = cent2] [6][3]) break
+								|	'polygon set p1 pair! set p2 pair! set p3 pair! set p4 pair!
+									if (
+										within-diamond? event/offset p1 p2 p3 p4
+									)(len: 5) break
+								|	['line | 'spline] copy points some pair! 
+									if (
+										is-within?: no
+										while [1 < length? points][
+											either at-distance-from-line? event/offset points/1 points/2 3 [is-within?: true break][points: next points]
+										]
+										is-within?
+									)(
+										points: parse at s 2 [collect some keep pair!]
+										len: 1 + length? points
+									) break
+								| 	'text set start pair! set txt string!
+									if (within? event/offset start text-size txt) (len: 3) break  ; size-text/with text-box txt
+								| 	if (head? s) (found: false) break
+								|	(s: back s) :s
+								]]
+							if found [
+								append edit1/draw copy/deep/part s len
+								switch s/1 [
+									box [append edit2/draw compose [
+										circle (start) 5 circle (end) 5 circle (as-pair end/x - radius start/y + radius) 3]
+									]
+									ellipse [append edit2/draw compose [circle (start) 5 circle (start + _size) 5]]
+									polygon [append edit2/draw compose [circle (p1) 5 circle (p2) 5 circle (p3) 5 circle (p4) 5]]
+									line spline [
+										clear ctrl-points 
+										foreach point points [append ctrl-points compose [circle (point) 5]] 
+										append edit2/draw ctrl-points
+										points: head points
+										change/part at edit1/menu/10 5 either wos: block? s/-1 [["wo start arrow" wos-arrow]][["start arrow" s-arrow]] 2
+										change/part at edit1/menu/10 7 either woe: 'transform = s/(2 + length? points) [["wo end arrow" woe-arrow]][["end arrow" e-arrow]] 2
+										change/part at edit1/menu/10 9 either all [wos woe] [["wo start/end arrow" wose-arrow]][["start/end arrow" se-arrow]] 2
+									]
+									;text []
+								]
 							]
 						]
-						;all [; Direct drawing of items
-							;event/down?
-							
-						;]
+						on-over: func [face event] [
+							any [
+								all [
+									event/shift? event/down?
+									ofs: either event/ctrl? [round/to event/offset 10][event/offset]
+									either start? [
+										case [
+											3 < absolute face/draw/:dlen/x - ofs/x [dir: 'horizontal]
+											3 < absolute face/draw/:dlen/y - ofs/y [dir: 'vertical]
+										]
+										either dir [start?: no][true]
+									][
+										switch dir [
+											horizontal [
+												either event/alt-down? [
+													face/draw/(dlen - 2)/x: face/draw/(dlen - 1)/x: ofs/x - face/draw/(dlen - 3)/x + face/draw/(dlen - 3)/x 
+												][
+													face/draw/(dlen - 2)/x: face/draw/(dlen - 1)/x: ofs/x - face/draw/(dlen - 3)/x / 2 + face/draw/(dlen - 3)/x 
+													face/draw/(dlen - 1)/y: ofs/y 
+												]
+											]
+											vertical [
+												either event/alt-down? [
+													face/draw/(dlen - 2)/y: face/draw/(dlen - 1)/y: ofs/y - face/draw/(dlen - 3)/y + face/draw/(dlen - 3)/y 
+												][
+													face/draw/(dlen - 2)/y: face/draw/(dlen - 1)/y: ofs/y - face/draw/(dlen - 3)/y / 2 + face/draw/(dlen - 3)/y 
+													face/draw/(dlen - 1)/x: ofs/x 
+												]
+											]
+										]
+										face/draw/:dlen: ofs
+									]
+								]
+								;all [; Direct drawing of items
+									;event/down?
+									
+								;]
+							]
+						]
 					]
 				]
 		]
@@ -488,7 +569,6 @@ ctx: context [
 					append canvas/draw head change at copy/deep face/pane/1/draw 8 reduce switch face/pane/1/draw/7 [
 						box [[beg: pos1 - 130x0 beg + face/pane/1/draw/9]]
 						ellipse [[pos1 - 130x0]]
-						;translate [[pos1 - 130x0]]
 						polygon [[pos1 - 130x0 pos1 - 100x30 pos1 - 130x60 pos1 - 160x30]]
 						circle [
 							either face/pane/1/draw/10 = 'circle [
@@ -572,7 +652,6 @@ ctx: context [
 						; right vertical
 						v3/2/x: v3/3/x: s/2/x + s/3/x
 					]
-					;translate [face/extra/2: as-pair face/draw/9/2/4/x face/draw/9/2/5/y]
 					polygon [
 						face/extra/2: as-pair face/draw/9/x - face/draw/11/x + 1 face/draw/10/y - face/draw/8/y + 1
 						; upper horizontal
@@ -823,7 +902,7 @@ ctx: context [
 										v3/2/x: v3/3/x: s/2/x + s/3/x
 										v2/2/x: v2/3/x: s/3/x / 2 + s/2/x
 										unless event/shift? [
-											forall connected [move-connected pos3diff]
+											move-connected pos3diff
 										]
 									]
 								]
@@ -842,7 +921,7 @@ ctx: context [
 										]
 										face/draw/8: s/2: df 
 										unless event/shift? [
-											forall connected [move-connected pos3diff]
+											move-connected pos3diff
 										]
 									]
 								]
@@ -853,39 +932,6 @@ ctx: context [
 								v2/2/x: v2/3/x: s/2/x
 								v3/2/x: v3/3/x: s/2/x + s/3
 							]
-							comment {
-							translate [
-								case [
-									within? event/offset s/2 + s/3/2/2 - 7 15x15 [
-										face/draw/9/2/2/y: s/3/2/2/y: diff/y - s/2/y
-										if event/shift? [
-											face/draw/9/2/5/y: s/3/2/5/y: negate s/3/2/2/y - 60
-										]
-									]
-									within? event/offset s/2 + s/3/2/5 - 7 15x15 [
-										face/draw/9/2/5/y: s/3/2/5/y: diff/y - s/2/y
-										if event/shift? [
-											face/draw/9/2/2/y: s/3/2/2/y: negate s/3/2/5/y - 60
-										]
-									]
-									within? event/offset s/2 + s/3/2/4 - 7 15x15 [
-										face/draw/9/2/4/x: s/3/2/4/x: diff/x - s/2/x
-										if event/shift? [
-											face/draw/9/2/6/x: s/3/2/6/x: negate s/3/2/4/x - 60
-										]
-									]
-									within? event/offset s/2 + s/3/2/6 - 7 15x15 [
-										face/draw/9/2/6/x: s/3/2/6/x: diff/x - s/2/x
-										if event/shift? [
-											face/draw/9/2/4/x: s/3/2/4/x: negate s/3/2/6/x - 60
-										]
-									]
-									true [
-										face/draw/8: s/2: df 
-										unless event/shift? [forall connected [change connected/1 connected/1/1 + pos3diff]]
-									]
-								]
-							]}
 							polygon [
 								df2: s/3 - s/2 df3: s/4 - s/2 df4: s/5 - s/2
 								face/draw/8: s/2: edit2/draw/8: df 
@@ -905,7 +951,7 @@ ctx: context [
 								unless event/shift? [move-connected pos3diff]
 							]
 						]
-						pos3: diff;event/offset ;
+						pos3: diff
 					]
 				]
 			]
@@ -919,8 +965,8 @@ ctx: context [
 					"connector" [
 						"line" line 
 						"spline" spline
-						"start-arrow" s-arrow ; TBD
-						"end-arrow" e-arrow ; TBD
+						"start-arrow" s-arrow 
+						"end-arrow" e-arrow 
 						"start/end arrow" se-arrow
 					]
 					"delete" delete
@@ -1062,9 +1108,9 @@ ctx: context [
 					| 	if (diff-end <= 5) (face/extra: [3 9 11])
 					| 	if (diff-rad <= 3) (face/extra: [4 10 14])
 					]
-				|	'ellipse set start pair! set size pair! (
+				|	'ellipse set start pair! set _size pair! (
 						diff-start: sqrt add power first ds: pos1 - start 2 power second ds 2
-						diff-end: sqrt add power first ds: pos1 - (start + size) 2 power second ds 2
+						diff-end: sqrt add power first ds: pos1 - (start + _size) 2 power second ds 2
 					)[
 						if (diff-start <= 5) (face/extra: [2 8 8]) 
 					| 	if (diff-end <= 5) (face/extra: [3 9 11])
@@ -1222,6 +1268,11 @@ ctx: context [
 						view/flags [field "2" 30 focus [also lw: face/data unview]][modal popup]
 						foreach shape shapes/pane [shape/draw/line-width: lw]
 					]
+				]
+			]
+			on-key: func [face event][
+				switch event/key [
+					#"^[" [clear at edit1/draw 7 clear at edit2/draw 7] ; escape
 				]
 			]
 		]
