@@ -4,8 +4,8 @@
 To get a shape to working area:
 - click on shape, release, drag to working area, release
 OR
-- click on shape, click on working area - every click adds pre-selected shape
-  to unselect click on pre-selected shape again (on left panel) or drag it to working area
+- click on shape, click on working area - every click adds pre-selected shape; 
+to unselect click on pre-selected shape again (on left panel) or drag it to working area
 
 To put a shape onto 10x10 grid 
 - hold down ctrl while dragging
